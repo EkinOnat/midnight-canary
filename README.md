@@ -273,10 +273,14 @@ no node, proof server or funded wallet needed:
 ├── src/
 │   ├── witnesses.ts             private state + witness implementations
 │   ├── deploy.ts                deployment script
+│   ├── verify.ts                reads public state back off the indexer
+│   ├── cli.ts                   check in, read the pulse, close a round
 │   └── network.ts               network config, seeds, deployment records
 ├── tests/
 │   ├── canary-simulator.ts      in-process test harness
 │   └── canary.test.ts           the test suite
+├── scripts/compile-summary.js   renders the circuit table after compiling
+├── screenshots/                 submission evidence
 ├── .github/workflows/           CI/CD (Level 3)
 └── README.md
 ```
@@ -307,4 +311,22 @@ to put anything more on-chain than that.
 
 ## Screenshots
 
-_[PLACEHOLDER — compile output and contract address screenshots to be added]_
+### Successful compile — circuits listed
+
+`npm run compile`. The compiler reports each proving circuit with its size, and
+the summary confirms the matching keys and ZKIR landed on disk. The three `pure`
+circuits are helpers that get inlined and need no proof of their own.
+
+![Compile output listing all five circuits](screenshots/01-compile-output.png)
+
+### Contract deployed — address and live on-chain state
+
+`npm run verify -- --network preview`. The address is read from the deployment
+record, then the contract's public state is fetched back off the Preview indexer
+to confirm it is genuinely live.
+
+Note what the public state contains: two counters, a threshold, a nullifier count
+and an admin hash. No wellbeing score and no responder identity appears anywhere
+in it — which is the whole point of the contract.
+
+![Deployment check showing the contract address and its public ledger state](screenshots/02-contract-deployed.png)
