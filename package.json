@@ -6,11 +6,12 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "compile": "compact compile contracts/canary.compact managed/canary",
+    "compile": "compact compile contracts/canary.compact managed/canary && node scripts/compile-summary.js managed/canary contracts/canary.compact",
     "build": "npx tsc --noEmit || true",
     "setup": "npx tsx src/setup.ts",
     "deploy": "npx tsx src/deploy.ts",
     "cli": "npx tsx src/cli.ts",
+    "verify": "npx tsx src/verify.ts",
     "check-balance": "npx tsx src/check-balance.ts",
     "network": "npx tsx src/network.ts",
     "proof-server:start": "docker compose up -d",

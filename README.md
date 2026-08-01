@@ -175,7 +175,23 @@ Compile the contract:
 npm run compile
 ```
 
-This writes circuits, proving/verifying keys and ZKIR to `managed/canary/`.
+This writes circuits, proving/verifying keys and ZKIR to `managed/canary/`, then
+prints what was built:
+
+```
+✓ Compiled contracts/canary.compact
+  language 0.23.0  |  compiler 0.31.1  |  runtime 0.16.0
+
+  CIRCUIT      KIND    PROOF     KEYS  ZKIR
+  -----------  ------  --------  ----  ----
+  deriveAdmin  pure    —
+  nullifier    pure    —
+  isAlert      pure    —
+  checkIn      impure  ZK proof  ✓     ✓
+  closeRound   impure  ZK proof  ✓     ✓
+
+  5 circuits (2 generating ZK proofs)
+```
 
 Deploy to Preview (prints a wallet address, then waits for you to fund it at
 https://midnight-tmnight-preview.nethermind.dev — it polls and continues by
@@ -190,6 +206,42 @@ Switch the active network at any time:
 ```bash
 npm run network preview
 ```
+
+## Verify the Deployment
+
+Reads the contract's public state straight back off the indexer. Needs no wallet
+and no funds — public state is public:
+
+```bash
+npm run verify -- --network preview
+```
+
+```
+  Contract:     713e14035854aee952c8f2c56f2b871f14f1ce8a8b59d2fa96e51f9d2204bbc8
+  ✅ Contract found on-chain.
+
+  ── Public ledger state ─────────────────────
+  round             1
+  responses         0
+  alerts            0
+  alertThreshold    score <= 2
+  checkedIn         0 nullifier(s)
+  admin             1b0b3de87b0445af770d7f10...
+  ────────────────────────────────────────────
+```
+
+That output is the *entire* public footprint of the contract. No score and no
+responder identity appears anywhere in it.
+
+## Interact With It
+
+```bash
+npm run cli
+```
+
+Private check-in, a public-pulse view, and an admin close-round action. Your
+responder identity is derived locally from a passphrase you type, so a single
+operator can exercise a multi-person round.
 
 ## Run Tests
 
