@@ -1,0 +1,138 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CANARY — an anonymous early-warning pulse for teams
+   ──────────────────────────────────────────────────────────────────────────
+
+   A team runs a "pulse round". Each member privately submits a wellbeing
+   score from 1 to 5. The organisation gets an honest aggregate signal — how
+   many people responded, and how many of them are struggling — while no one,
+   including whoever deployed the contract, can learn any individual's score
+   or link a submission back to a person.
+
+   ── PUBLIC (written to the ledger, readable by anyone) ────────────────────
+
+     round           Which pulse round is currently open.
+     responses       How many people have checked in this round.
+     alerts          How many of those check-ins were at or below the
+                     alert threshold.
+     checkedIn       Set of one-way nullifiers. Each is an opaque 32-byte
+                     hash that proves "some eligible person checked in"
+                     without saying who. Prevents double check-ins.
+     alertThreshold  The score at or below which a check-in counts as an
+                     alert. Public so the aggregate is interpretable.
+     admin           A hash of the deployer's secret. Used to gate
+                     closeRound(). Reveals nothing about the secret itself.
+
+   ── PRIVATE (witnesses — never leave the responder's machine) ─────────────
+
+     localSecretKey()   The responder's 32-byte identity secret.
+     wellbeingScore()   The actual 1..5 score.
+
+   Neither value is ever written to the ledger, passed to a circuit as a
+   public argument, or included in a transaction. They exist only as inputs
+   to the zero-knowledge proof.
+
+   ── WHAT A RESPONDER PROVES WITHOUT REVEALING ─────────────────────────────
+
+     "I hold a secret key, I have not already checked in this round, and my
+      score is a valid value between 1 and 5."
+
+   ...while revealing exactly two things:
+
+     (a) A round-scoped nullifier. It is a one-way hash, so it identifies
+         nobody; and because the round number is mixed in, the same person's
+         nullifiers in different rounds are unlinkable.
+
+     (b) ONE BIT — whether the score was at or below alertThreshold.
+
+   That single bit is the entire deliberate disclosure of this contract. A
+   score of 1 and a score of 2 are indistinguishable on-chain (both alert);
+   so are 3, 4 and 5 (none alert). The score itself never escapes.
+
+   ── A NOTE ON IDENTITY ────────────────────────────────────────────────────
+
+   Identity here is derived from a hash of a private secret, NOT from
+   ownPublicKey(). ownPublicKey() returns a prover-claimed value with no
+   cryptographic binding to the transaction signer, so any access check
+   built on it is bypassable.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// ─── Public ledger state ───────────────────────────────────────────────────
+
+export ledger round: Counter;
+export ledger responses: Counter;
+export ledger alerts: Counter;
+export ledger checkedIn: Set<Bytes<32>>;
+export ledger alertThreshold: Uint<8>;
+export ledger admin: Bytes<32>;
+
+// ─── Private witnesses ─────────────────────────────────────────────────────
+
+witness localSecretKey(): Bytes<32>;
+witness wellbeingScore(): Uint<8>;
+
+// ─── Construction ──────────────────────────────────────────────────────────
+
+constructor() {
+  round.increment(1);
+  alertThreshold = 2;
+  // The deployer's secret is hashed; only the hash is stored.
+  admin = disclose(deriveAdmin(localSecretKey()));
+}
+
+// ─── Pure helpers ──────────────────────────────────────────────────────────
+
+// Stable, domain-separated commitment to the deployer's secret.
+export pure circuit deriveAdmin(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<[Bytes<15>, Bytes<32>]>(["canary:admin:v1", sk]);
+}
+
+// One-way and round-scoped. Same person + same round -> same nullifier, which
+// is what blocks a second check-in. Same person + a later round -> a value
+// that cannot be linked to the earlier one.
+export pure circuit nullifier(sk: Bytes<32>, r: Bytes<32>): Bytes<32> {
+  return persistentHash<[Bytes<13>, Bytes<32>, Bytes<32>]>(["canary:nul:v1", r, sk]);
+}
+
+// The threshold comparison, isolated so it is obvious that the only thing
+// crossing the privacy boundary is this one boolean.
+export pure circuit isAlert(score: Uint<8>, threshold: Uint<8>): Boolean {
+  return score <= threshold;
+}
+
+// ─── Circuits ──────────────────────────────────────────────────────────────
+
+export circuit checkIn(): [] {
+  const sk = localSecretKey();
+  const score = wellbeingScore();
+
+  // Asserting on private data is safe: a false assertion simply makes the
+  // proof unsatisfiable. No disclose() needed, and nothing is revealed.
+  assert(score >= 1, "score must be at least 1");
+  assert(score <= 5, "score must be at most 5");
+
+  // Disclosure #1: an unlinkable, one-way nullifier.
+  const nul = disclose(nullifier(sk, round as Field as Bytes<32>));
+  assert(!checkedIn.member(nul), "already checked in this round");
+  checkedIn.insert(nul);
+
+  responses.increment(1);
+
+  // Disclosure #2 — and the last: exactly one bit about a private score.
+  if (disclose(isAlert(score, alertThreshold))) {
+    alerts.increment(1);
+  }
+}
+
+export circuit closeRound(): [] {
+  assert(admin == disclose(deriveAdmin(localSecretKey())),
+         "only the admin may close a round");
+
+  round.increment(1);
+  responses.resetToDefault();
+  alerts.resetToDefault();
+  checkedIn.resetToDefault();
+}
