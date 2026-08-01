@@ -283,7 +283,27 @@ no node, proof server or funded wallet needed:
 
 ## Initial Idea
 
-_[PLACEHOLDER — to be filled in manually]_
+Most organisations run some version of an anonymous wellbeing survey, and almost
+nobody believes the "anonymous" part. The tool can see your answer; whoever
+administers it can too. So people answer strategically — a 3 instead of a 1 — and
+the organisation gets back a number that looks reassuring at exactly the moment it
+shouldn't. It's a trust problem, and no privacy policy fixes it, because the raw
+answers genuinely are sitting on a server somewhere.
+
+That's what made me want to build this on Midnight. Zero-knowledge proofs let you
+flip the default: instead of collecting answers and promising not to look, you
+never collect them at all. The responder proves a statement *about* their score —
+that it's a valid value, that they haven't already answered this round, and
+whether it crosses the alert threshold — and the score itself never leaves their
+machine.
+
+The constraint I set myself was to find the smallest thing the chain could learn
+that would still be useful. A team lead doesn't need individual scores; they need
+to know whether the number of people struggling is going up. That turns out to be
+one bit per person. Canary is what falls out when you take that seriously: two
+public counters, a set of one-way nullifiers so nobody can answer twice, and
+nothing else. The hard part wasn't making it private — it was resisting the urge
+to put anything more on-chain than that.
 
 ## Screenshots
 
