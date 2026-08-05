@@ -7,6 +7,7 @@ yarn-error.log*
 # Build output
 dist/
 build/
+*.tsbuildinfo
 
 # Environment variables
 .env
@@ -20,6 +21,11 @@ build/
 # circuits and verifier keys are part of what this project ships.
 contracts/managed/
 
+# Staged copy of the ZK artifacts for the browser. Generated from managed/ by
+# scripts/copy-zk-assets.js on every dev/build — committing it would duplicate
+# 5.6 MB of binaries.
+public/managed/
+
 # Deployment info
 deployment.json
 
@@ -29,9 +35,10 @@ deployment.json
 .DS_Store
 Thumbs.db
 
-# IDE files
+# IDE / agent tooling
 .vscode/settings.json
 .idea/
+.claude/
 *.swp
 *.swo
 
