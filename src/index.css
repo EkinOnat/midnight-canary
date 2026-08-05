@@ -1,0 +1,834 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Canary
+   ───────────────────────────────────────────────────────────────────────────
+   The layout is the privacy model. The page is split by a seam: everything
+   left of it happens on the responder's machine, everything right of it is
+   public on-chain. Colour temperature, typeface and texture all flip at that
+   seam, so a reader can see which side their answer is on without being told.
+
+   Your side is dim and warm — privacy is lamplight. The chain's side is bright
+   and cold — being on a public ledger is fluorescent.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Self-hosted rather than served from Google's CDN. This page claims to make
+   no third-party requests; a font CDN would make that untrue. Both faces are
+   SIL Open Font License 1.1 — see public/fonts/LICENSE.md. */
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/fraunces-var-latin.woff2') format('woff2-variations');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sometype Mono';
+  src: url('/fonts/sometype-mono-var-latin.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --dusk: #1b1a22;
+  --dusk-lift: #23222c;
+  --dusk-ink: #ebe6dc;
+  --dusk-mute: #948da0;
+
+  --lamp: #f0c64e;
+  --ember: #c86a4a;
+
+  --glare: #e7eae5;
+  --glare-lift: #dce0da;
+  --graphite: #34383a;
+  /* 5.15:1 on --glare. The obvious #6F7570 measured 3.88:1, which fails AA for
+     the 11px labels this is used on. */
+  --graphite-mute: #5c625d;
+
+  --seam: #6f7570;
+  /* The seam band is neither side: a neutral stone, flat rather than a
+     gradient, so its label has one predictable backdrop to contrast against. */
+  --seam-band: #8e948f;
+
+  --display: 'Fraunces', Georgia, serif;
+  --mono: 'Sometype Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Fraunces axis presets. Every rule that switches face also restates all
+     four axes — font-variation-settings does not merge with inherited values. */
+  --fr-air: 'opsz' 120, 'SOFT' 70, 'WONK' 1, 'wght' 500;
+  --fr-text: 'opsz' 14, 'SOFT' 24, 'WONK' 0, 'wght' 400;
+  --fr-text-bold: 'opsz' 14, 'SOFT' 24, 'WONK' 0, 'wght' 600;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--dusk);
+  color: var(--dusk-ink);
+  font-family: var(--display);
+  font-variation-settings: var(--fr-text);
+  font-size: 1rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--seam);
+  text-underline-offset: 0.22em;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lamp);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Shell ──────────────────────────────────────────────────────────────── */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Top rail ───────────────────────────────────────────────────────────── */
+
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.85rem clamp(1.1rem, 4vw, 2.75rem);
+  border-bottom: 1px solid color-mix(in srgb, var(--seam) 45%, transparent);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--dusk-mute);
+}
+
+.rail-mark {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 40, 'SOFT' 60, 'WONK' 1, 'wght' 600;
+  font-size: 1.12rem;
+  letter-spacing: 0.01em;
+  color: var(--dusk-ink);
+  line-height: 1;
+}
+
+.rail-mark::after {
+  content: '·';
+  margin-left: 0.5rem;
+  color: var(--lamp);
+}
+
+.rail-facts {
+  display: flex;
+  gap: 1.35rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.rail-facts div {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+
+.rail-facts dt {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.61rem;
+  opacity: 0.65;
+}
+
+.rail-facts dd {
+  margin: 0;
+  color: var(--dusk-ink);
+}
+
+.rail-spacer {
+  flex: 1 1 2rem;
+}
+
+.rail-wallet {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.rail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  font-size: 0.61rem;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--seam);
+  flex: none;
+}
+
+.dot-live {
+  background: var(--lamp);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lamp) 22%, transparent);
+}
+
+.trunc {
+  max-width: 15ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+/* ─── Notice strip ───────────────────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.8rem clamp(1.1rem, 4vw, 2.75rem);
+  border-bottom: 1px solid color-mix(in srgb, var(--ember) 50%, transparent);
+  background: color-mix(in srgb, var(--ember) 15%, var(--dusk));
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.notice-tag {
+  font-size: 0.61rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ember);
+  flex: none;
+}
+
+.notice-hint {
+  color: var(--dusk-mute);
+}
+
+/* ─── The split ──────────────────────────────────────────────────────────── */
+
+.split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px minmax(0, 21rem);
+  align-items: stretch;
+}
+
+/* ── your side ── */
+
+/* Capped for a readable measure, but generously — the leftover dusk between
+   the text and the seam is deliberate breathing room around the signature
+   element, not an accident of the grid. */
+.yours {
+  padding: clamp(2rem, 5vw, 3.6rem) clamp(1.1rem, 4vw, 2.75rem) 3rem;
+  max-width: 50rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--dusk-mute);
+  margin: 0 0 1.15rem;
+}
+
+.eyebrow b {
+  color: var(--lamp);
+  font-weight: 400;
+}
+
+.headline {
+  font-variation-settings: var(--fr-air);
+  font-size: clamp(2.35rem, 5.4vw, 3.85rem);
+  line-height: 0.97;
+  letter-spacing: -0.022em;
+  margin: 0 0 1.2rem;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: 1.06rem;
+  line-height: 1.58;
+  color: color-mix(in srgb, var(--dusk-ink) 82%, var(--dusk));
+  margin: 0 0 0.85rem;
+  max-width: 34ch;
+}
+
+.standfirst strong {
+  font-variation-settings: var(--fr-text-bold);
+  color: var(--dusk-ink);
+}
+
+.aside {
+  font-size: 0.92rem;
+  color: var(--dusk-mute);
+  margin: 0;
+  max-width: 40ch;
+}
+
+/* ── section heads ── */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 2.6rem 0 1.3rem;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--dusk-mute);
+}
+
+.head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--seam) 40%, transparent);
+}
+
+/* ── the scale ── */
+
+.ask {
+  font-variation-settings: 'opsz' 48, 'SOFT' 60, 'WONK' 1, 'wght' 500;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  margin: 0 0 1.1rem;
+}
+
+.scale {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.scale-anchors {
+  display: flex;
+  justify-content: space-between;
+  max-width: 19.5rem;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--dusk-mute);
+  margin-bottom: 0.5rem;
+}
+
+.scale-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tick {
+  width: 3.4rem;
+  height: 3.4rem;
+  flex: none;
+  border: 1px solid color-mix(in srgb, var(--seam) 55%, transparent);
+  border-radius: 2px;
+  background: var(--dusk-lift);
+  color: var(--dusk-ink);
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 36, 'SOFT' 40, 'WONK' 0, 'wght' 500;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.tick:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lamp) 16%, var(--dusk-lift));
+  border-color: var(--lamp);
+  transform: translateY(-2px);
+}
+
+.tick:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Armed state. The chosen value is never rendered again — this replaces it. */
+.sealed {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sealed-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 1.05rem;
+  border: 1px dashed var(--lamp);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--lamp) 10%, transparent);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+}
+
+.sealed-mark::before {
+  content: '';
+  width: 0.62rem;
+  height: 0.62rem;
+  background: var(--lamp);
+  border-radius: 1px;
+}
+
+/* ── identity line ── */
+
+.who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0 1.9rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--seam) 28%, transparent);
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  color: var(--dusk-mute);
+}
+
+.who code {
+  color: var(--dusk-ink);
+}
+
+/* ── buttons ── */
+
+.act {
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 0.58rem 1rem;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--seam) 60%, transparent);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.act:hover:not(:disabled) {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.act:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.act-key {
+  display: block;
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.02rem 1.4rem;
+  font-size: 0.86rem;
+  letter-spacing: 0.16em;
+  background: var(--lamp);
+  border-color: var(--lamp);
+  color: #241d05;
+}
+
+.act-key:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lamp) 84%, #fff);
+  border-color: color-mix(in srgb, var(--lamp) 84%, #fff);
+}
+
+.act-key:disabled {
+  background: transparent;
+  color: var(--dusk-mute);
+  border-color: color-mix(in srgb, var(--seam) 45%, transparent);
+  opacity: 1;
+}
+
+.claim {
+  max-width: 26rem;
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  color: var(--lamp);
+}
+
+/* ── progress ── */
+
+.phases {
+  list-style: none;
+  margin: 1.6rem 0 0;
+  padding: 0;
+  max-width: 26rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+.phase {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.32rem 0;
+  color: color-mix(in srgb, var(--dusk-mute) 70%, var(--dusk));
+}
+
+.phase-now {
+  color: var(--dusk-ink);
+}
+
+.phase-done {
+  color: var(--dusk-mute);
+}
+
+.phase-pip {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--seam) 50%, transparent);
+}
+
+.phase-done .phase-pip {
+  background: var(--dusk-mute);
+}
+
+.phase-now .phase-pip {
+  background: var(--lamp);
+  animation: pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ── kept-here strip ── */
+
+.kept {
+  display: flex;
+  gap: 1.6rem;
+  flex-wrap: wrap;
+  margin: 2.4rem 0 0;
+  padding-top: 1.15rem;
+  border-top: 1px solid color-mix(in srgb, var(--seam) 28%, transparent);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--dusk-mute);
+}
+
+.kept div {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.redacted {
+  display: inline-block;
+  width: 2.6rem;
+  height: 0.82rem;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--dusk-mute) 0 2px,
+    transparent 2px 4px
+  );
+  border: 1px solid color-mix(in srgb, var(--dusk-mute) 60%, transparent);
+  vertical-align: -0.1em;
+}
+
+.kept-note {
+  flex-basis: 100%;
+  max-width: 46ch;
+  line-height: 1.55;
+  color: var(--dusk-mute);
+}
+
+/* ─── The seam ───────────────────────────────────────────────────────────── */
+/* The signature element. Labelled with the only two things that ever cross
+   it, and the place the crossing is animated on a successful check-in. */
+
+.seam-col {
+  position: relative;
+  border-left: 1px solid color-mix(in srgb, var(--seam) 55%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--seam) 55%, transparent);
+  background: var(--seam-band);
+  overflow: hidden;
+}
+
+.seam-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.42em;
+  white-space: nowrap;
+  color: var(--dusk);
+  user-select: none;
+}
+
+.seam-spark {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 1px;
+  background: var(--lamp);
+  opacity: 0;
+}
+
+.seam-crossing .seam-spark {
+  animation: cross 1.15s cubic-bezier(0.6, 0, 0.35, 1) forwards;
+}
+
+@keyframes cross {
+  0% {
+    opacity: 0;
+    transform: translateY(60px) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(20px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-90px) scale(0.5);
+  }
+}
+
+/* ─── The chain's side ───────────────────────────────────────────────────── */
+
+.chain {
+  background: var(--glare);
+  color: var(--graphite);
+  padding: clamp(2rem, 5vw, 3.6rem) clamp(1.1rem, 3vw, 1.9rem) 3rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.chain-head {
+  margin: 0 0 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.chain-sub {
+  margin: 0 0 1.7rem;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--graphite-mute);
+}
+
+.chain :focus-visible {
+  outline-color: var(--graphite);
+}
+
+.chain .act {
+  border-color: color-mix(in srgb, var(--graphite) 32%, transparent);
+}
+
+.rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.rows dt {
+  padding: 0.42rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--graphite) 15%, transparent);
+  font-size: 0.71rem;
+  letter-spacing: 0.05em;
+  color: var(--graphite-mute);
+}
+
+.rows dd {
+  margin: 0;
+  padding: 0.42rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--graphite) 15%, transparent);
+  text-align: right;
+  font-weight: 500;
+}
+
+.rows .bumped {
+  animation: bump 900ms ease;
+}
+
+@keyframes bump {
+  0%,
+  100% {
+    background: transparent;
+  }
+  20% {
+    background: color-mix(in srgb, var(--lamp) 55%, transparent);
+  }
+}
+
+.wrapcode {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.chain-empty {
+  margin: 0 0 1.6rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--graphite) 28%, transparent);
+  font-size: 0.73rem;
+  color: var(--graphite-mute);
+}
+
+.chain-block {
+  margin-top: 1.9rem;
+}
+
+.chain-foot {
+  margin: 1.9rem 0 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--graphite) 15%, transparent);
+  font-size: 0.71rem;
+  line-height: 1.55;
+  color: var(--graphite-mute);
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+
+.foot {
+  padding: 1.1rem clamp(1.1rem, 4vw, 2.75rem) 1.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--seam) 40%, transparent);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: var(--dusk-mute);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 62rem) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .yours {
+    max-width: none;
+  }
+
+  /* The seam turns horizontal: same meaning, same label, rotated. */
+  .seam-col {
+    height: 46px;
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid color-mix(in srgb, var(--seam) 55%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--seam) 55%, transparent);
+  }
+
+  .seam-label {
+    writing-mode: horizontal-tb;
+    transform: translate(-50%, -50%);
+    letter-spacing: 0.34em;
+  }
+
+  .seam-spark {
+    top: 50%;
+    margin-top: -4.5px;
+  }
+
+  @keyframes cross {
+    0% {
+      opacity: 0;
+      transform: translateX(-70px) scale(0.5);
+    }
+    25% {
+      opacity: 1;
+      transform: translateX(-24px) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(90px) scale(0.5);
+    }
+  }
+}
+
+@media (max-width: 34rem) {
+  .tick {
+    width: 2.85rem;
+    height: 2.85rem;
+    font-size: 1.12rem;
+  }
+
+  .scale-anchors {
+    max-width: 16.6rem;
+  }
+
+  .rail {
+    gap: 0.75rem 1.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .tick:hover:not(:disabled) {
+    transform: none;
+  }
+}
