@@ -61,8 +61,14 @@ export const fallbackIndexer = (network: string) =>
 export const PRIVATE_STATE_PASSWORD =
   import.meta.env.VITE_PRIVATE_STATE_PASSWORD?.trim() || undefined;
 
-/** Where {@link FetchZkConfigProvider} looks for prover keys and ZKIR. */
-export const ZK_CONFIG_BASE_URL = `${window.location.origin}/managed/canary`;
+/**
+ * Where {@link FetchZkConfigProvider} looks for prover keys and ZKIR.
+ *
+ * A function, not a constant: reading `window` at module scope would make
+ * importing this file throw outside a browser, which would in turn make every
+ * module that transitively imports it impossible to unit-test.
+ */
+export const zkConfigBaseUrl = () => `${window.location.origin}/managed/canary`;
 
 /** Must match the `privateStateId` used by `src/deploy.ts` and `src/cli.ts`. */
 export const PRIVATE_STATE_ID = 'canaryPrivateState';
