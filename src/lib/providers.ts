@@ -93,7 +93,18 @@ export async function buildProviders(
   const indexerWsUri = config?.indexerWsUri || fallback.ws;
 
   // Prover keys and ZKIR are served from this origin under /managed/canary/.
-  const zkConfigProvider = new FetchZkConfigProvider<CanaryCircuitId>(zkConfigBaseUrl());
+  //
+  // The bound fetch is required, not defensive. FetchZkConfigProvider stores
+  // its fetch on the instance and calls it as `this.fetchFunc(...)`, and
+  // cross-fetch's browser build re-exports the *unbound* global fetch — so the
+  // default invokes native fetch with the provider as `this` and the browser
+  // rejects it with "Failed to execute 'fetch' on 'Window': Illegal
+  // invocation". It surfaces at connect, because findDeployedContract fetches
+  // the verifier keys to check them against the deployed contract.
+  const zkConfigProvider = new FetchZkConfigProvider<CanaryCircuitId>(
+    zkConfigBaseUrl(),
+    globalThis.fetch.bind(globalThis),
+  );
 
   // Proving is delegated to the wallet, which proves locally. `KeyMaterialProvider`
   // is the connector's name for the same three methods `ZKConfigProvider` exposes.
