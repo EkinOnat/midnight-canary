@@ -292,7 +292,12 @@ hosting your own deployment.
 
 ## Demo Video
 
-**[PLACEHOLDER — link to be added after recording]**
+**https://youtu.be/biNR6PxyLR4**
+
+Connecting Lace on Preview, then a live `checkIn` call: the score is picked and
+immediately hidden, the proof is generated locally, and the transaction lands
+on-chain — with the public counters moving and the score never appearing
+anywhere on screen.
 
 ## Verify the Deployment
 
