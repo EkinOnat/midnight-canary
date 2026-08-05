@@ -4,8 +4,11 @@
 
 ## Live Demo
 
-<!-- Replace after running `npx vercel --prod` (see "Deploy the frontend" below). -->
-**[PASTE LIVE URL AFTER DEPLOYING FRONTEND]**
+**https://midnight-canary.vercel.app**
+
+Connect Lace on Preview and check in. The public counters load without a
+wallet, so you can see the contract's live on-chain state before connecting
+anything.
 
 ## Contract Address
 

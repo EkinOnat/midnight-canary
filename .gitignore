@@ -9,12 +9,11 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment variables. `.env.local` also holds the Vercel OIDC token, so the
+# glob is deliberately broad — but `.env.example` documents the settings and is
+# meant to be committed.
+.env*
+!.env.example
 
 # Contract artifacts.
 # NOTE: the root `managed/` directory IS committed on purpose — the compiled
@@ -73,3 +72,6 @@ temp/
 # Local private-state store. Holds responders' secret keys and scores —
 # this is exactly the data the contract is designed to keep off-chain.
 midnight-level-db/
+
+# Vercel project link and the OIDC token it downloads
+.vercel
