@@ -29,7 +29,7 @@ import {
   CONTRACT_ADDRESS,
   PRIVATE_STATE_ID,
   PRIVATE_STATE_PASSWORD,
-  ZK_CONFIG_BASE_URL,
+  zkConfigBaseUrl,
   fallbackIndexer,
 } from '../config';
 import { getStoragePassword } from './identity';
@@ -93,7 +93,7 @@ export async function buildProviders(
   const indexerWsUri = config?.indexerWsUri || fallback.ws;
 
   // Prover keys and ZKIR are served from this origin under /managed/canary/.
-  const zkConfigProvider = new FetchZkConfigProvider<CanaryCircuitId>(ZK_CONFIG_BASE_URL);
+  const zkConfigProvider = new FetchZkConfigProvider<CanaryCircuitId>(zkConfigBaseUrl());
 
   // Proving is delegated to the wallet, which proves locally. `KeyMaterialProvider`
   // is the connector's name for the same three methods `ZKConfigProvider` exposes.

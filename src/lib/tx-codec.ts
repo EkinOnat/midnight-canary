@@ -26,11 +26,14 @@ export function encodeTx(tx: UnboundTransaction | FinalizedTransaction): string 
  * right generic instantiation at runtime.
  */
 export function decodeFinalizedTx(encoded: string): FinalizedTransaction {
+  // `fromHex` returns a Buffer, whose prototype is Uint8Array.prototype — so it
+  // is already the type the deserializer wants. Wrapping it would copy the
+  // whole transaction for nothing.
   return Transaction.deserialize(
     'signature',
     'proof',
     'binding',
-    new Uint8Array(fromHex(stripPrefix(encoded))),
+    fromHex(stripPrefix(encoded)),
   ) as FinalizedTransaction;
 }
 

@@ -21,18 +21,9 @@ import {
 } from '../lib/connector';
 import { buildProviders, publicDataProviderFor, type CanaryProviders } from '../lib/providers';
 import type { PublicDataProvider } from '@midnight-ntwrk/midnight-js-types';
-import { compiledContract, readPulse, type PublicPulse } from '../lib/canary';
-import { getIdentitySecret } from '../lib/identity';
-import { createCanaryPrivateState } from '../witnesses';
+import { compiledContract, readPulse, scrubbedPrivateState, type PublicPulse } from '../lib/canary';
 
 export type ConnectionStatus = 'idle' | 'detecting' | 'connecting' | 'connected' | 'error';
-
-/**
- * `checkIn` only ever reads the score through a witness, so the value stored
- * alongside the identity secret between calls is irrelevant. It is parked at a
- * valid-but-meaningless 3 so no real answer is left sitting in the store.
- */
-const SCRUBBED_SCORE = 3;
 
 export interface MidnightSession {
   readonly status: ConnectionStatus;
@@ -190,7 +181,7 @@ export function useMidnight(): MidnightSession {
           compiledContract: compiledContract as never,
           contractAddress: CONTRACT_ADDRESS,
           privateStateId: PRIVATE_STATE_ID,
-          initialPrivateState: createCanaryPrivateState(getIdentitySecret(), SCRUBBED_SCORE),
+          initialPrivateState: scrubbedPrivateState(),
         });
 
         setProviders(built.providers);

@@ -58,7 +58,9 @@ export interface DiscoveredWallet {
  * wallet that is about to appear. Callers poll via {@link waitForWallets}.
  */
 export function discoverWallets(): DiscoveredWallet[] {
-  const injected = window.midnight;
+  // Guarded so this module can be imported and its error mapping exercised
+  // outside a browser — see tests/connector.test.ts.
+  const injected = typeof window === 'undefined' ? undefined : window.midnight;
   if (!injected) return [];
   return Object.entries(injected)
     .filter(([, api]) => typeof api?.connect === 'function')

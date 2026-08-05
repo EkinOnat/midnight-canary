@@ -10,10 +10,30 @@ import * as Canary from '../../managed/canary/contract/index.js';
 import type { Ledger } from '../../managed/canary/contract/index.js';
 import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-js';
 import type { ContractState } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { witnesses, type CanaryPrivateState } from '../witnesses';
+import { witnesses, createCanaryPrivateState, type CanaryPrivateState } from '../witnesses';
+import { getIdentitySecret } from './identity';
 
 export type { CanaryPrivateState, Ledger };
-export { createCanaryPrivateState } from '../witnesses';
+export { createCanaryPrivateState };
+
+/**
+ * The score parked in the private-state store between calls.
+ *
+ * `checkIn` only ever reads the score through a witness at call time, so
+ * whatever sits in the store in between is never proven over. It is held at a
+ * valid-but-meaningless value so that no real answer is left at rest.
+ */
+export const SCRUBBED_SCORE = 3;
+
+/**
+ * A private state carrying this browser's identity but no real answer.
+ *
+ * Used both to seed the store on first connect and to scrub it after a
+ * check-in. Both callers want the same thing — "my identity, no score" — so
+ * they share one definition rather than each spelling it out.
+ */
+export const scrubbedPrivateState = (): CanaryPrivateState =>
+  createCanaryPrivateState(getIdentitySecret(), SCRUBBED_SCORE);
 
 /** The two circuits that generate a ZK proof. The three `pure` helpers inline. */
 export type CanaryCircuitId = 'checkIn' | 'closeRound';

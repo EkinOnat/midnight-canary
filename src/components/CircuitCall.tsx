@@ -16,13 +16,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { MidnightSession } from '../hooks/useMidnight';
 import { PRIVATE_STATE_ID } from '../config';
-import { createCanaryPrivateState } from '../lib/canary';
+import { createCanaryPrivateState, scrubbedPrivateState } from '../lib/canary';
 import { getIdentitySecret, identityFingerprint, rotateIdentitySecret } from '../lib/identity';
 import { PHASE_LABELS, PHASE_ORDER, onCallPhase, type CallPhase } from '../lib/progress';
 import { describeWalletError } from '../lib/connector';
 
 const SCORES = [1, 2, 3, 4, 5] as const;
-const SCRUBBED_SCORE = 3;
 const CROSSING_MS = 1200;
 
 interface Receipt {
@@ -112,10 +111,7 @@ export function CircuitCall({
       // Leave no real answer behind in the store between calls.
       scoreRef.current = null;
       try {
-        await providers?.privateStateProvider.set(
-          PRIVATE_STATE_ID,
-          createCanaryPrivateState(getIdentitySecret(), SCRUBBED_SCORE),
-        );
+        await providers?.privateStateProvider.set(PRIVATE_STATE_ID, scrubbedPrivateState());
       } catch {
         /* scrubbing is best-effort; a failure here reveals nothing */
       }
