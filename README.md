@@ -1,15 +1,30 @@
 # Canary
 
-> An anonymous early-warning pulse for teams: members submit a private wellbeing score, and the chain learns only how many people are struggling — never who, and never their score.
+> An anonymous early-warning pulse for teams: members submit a private wellbeing score from their browser, and the chain learns only how many people are struggling — never who, and never their score.
+
+## Live Demo
+
+<!-- Replace after running `npx vercel --prod` (see "Deploy the frontend" below). -->
+**[PASTE LIVE URL AFTER DEPLOYING FRONTEND]**
 
 ## Contract Address
 
 | Network  | Address                                                            |
 |----------|--------------------------------------------------------------------|
 | Preview  | `713e14035854aee952c8f2c56f2b871f14f1ce8a8b59d2fa96e51f9d2204bbc8` |
-| Preprod  | _not deployed_                                                     |
+| Preprod  | _not deployed — see note below_                                    |
 
 Deployer wallet (Preview): `mn_addr_preview19d33qe75jerz3awkld4r6fw6ghnmfpp83mna23w55my9jvkpvu5q33pat6`
+Deploy transaction: `8342fa92366596f8a1b8088e4b7d2615916021d60f9db00efdfa5450ead3c03f`
+
+> **On Preview vs Preprod.** The Midnight **Preprod** environment is currently
+> down and its faucet is out of service — `wss://rpc.preprod.midnight.network`
+> hangs on wallet sync. The Midnight ecosystem team directed builders to deploy
+> on **Preview** instead, using https://faucet.preview.midnight.network/. This
+> project therefore targets Preview, and the frontend defaults to the Preview
+> address above. The network is a single environment variable
+> (`VITE_MIDNIGHT_NETWORK`) and `src/network.ts` already carries full Preprod
+> config, so switching back is a one-line change once Preprod returns.
 
 <sub>A `hello-world` contract was also deployed to Preview at
 `3ae77641aa1122229570d8a813b7e65058253d900c780753e0d29e7e9d0e16b5` to validate the
@@ -24,8 +39,10 @@ the organisation gets back is worthless precisely when it matters most.
 
 Canary fixes that at the cryptographic level rather than the policy level.
 
-A team runs a **pulse round**. Each member privately submits a wellbeing score
-from 1 to 5. What lands on-chain is:
+A team runs a **pulse round**. Each member opens the dApp, connects their Lace
+wallet, and picks a wellbeing score from 1 to 5. The score is used to build a
+zero-knowledge proof on their own machine and is then discarded. What lands
+on-chain is:
 
 - how many people checked in, and
 - how many of them were at or below the alert threshold.
@@ -65,6 +82,15 @@ trajectory over time.
 Neither is ever written to the ledger, passed as a public circuit argument, or
 included in a transaction. They exist only as inputs to the zero-knowledge proof.
 
+In the browser this is enforced structurally as well as cryptographically. The
+score is held in a React `ref`, never in component state, and is cleared before
+the proof begins — so it is not rendered, not serialisable from a devtools
+snapshot, and not present in the DOM after you pick it. The identity secret is
+generated locally with `crypto.getRandomValues`, stored encrypted in the
+browser's private-state store, and only ever shown as a six-character
+fingerprint. See [`src/components/CircuitCall.tsx`](src/components/CircuitCall.tsx)
+and [`src/lib/identity.ts`](src/lib/identity.ts).
+
 **What the user PROVES without revealing:**
 
 > "I hold a secret key, I have not already checked in this round, and my score is
@@ -90,15 +116,37 @@ A score of 1 and a score of 2 are **indistinguishable on-chain** (both alert), a
 are 3, 4 and 5 (none alert). This isn't a claim in a comment — it's asserted in
 the test suite, which runs two check-ins differing only in the private score and
 requires the resulting public state to be byte-identical. See
-`tests/canary.test.ts`, block 5.
+[`tests/canary.test.ts`](tests/canary.test.ts), block 5.
 
-### A note on identity
+## Privacy Claim
 
-Identity is derived from a hash of a private secret, **not** from
-`ownPublicKey()`. `ownPublicKey()` returns a prover-claimed value with no
-cryptographic binding to the transaction signer, so any access check built on it
-is bypassable. The admin role is `persistentHash("canary:admin:v1", secret)`,
-frozen into the ledger at construction.
+**An on-chain observer sees:**
+
+- that a transaction touched the Canary contract, and when;
+- a 32-byte nullifier that was added to the `checkedIn` set;
+- `responses` incremented by one;
+- `alerts` either incremented by one, or not — one bit;
+- the fee payment, and therefore the paying wallet.
+
+**An on-chain observer cannot see:**
+
+- **the wellbeing score.** Scores 1 and 2 produce byte-identical public state, as
+  do 3, 4 and 5. The score never enters the transaction in any form — not
+  encrypted, not committed, not at all.
+- **which person submitted.** The nullifier is `persistentHash("canary:nul:v1",
+  round, secretKey)`. The secret key is generated in the browser and never
+  transmitted; the hash is one-way. It is not derived from the wallet key, so
+  the fee-paying wallet does not identify the responder either.
+- **whether the same person answered in two rounds.** The round number is mixed
+  into the hash, so one person's nullifiers across rounds are unlinkable — you
+  cannot follow anyone's trajectory over time.
+- **whether a given person participated at all.** Nothing on-chain links a
+  nullifier to an identity, so non-participation is indistinguishable from
+  participation by someone else.
+
+The proof itself is generated by the user's own wallet on the user's own
+machine. This dApp has no backend: the deployed site is static files, and the
+only network calls it makes are to the Midnight indexer the wallet nominates.
 
 ### Known limits
 
@@ -109,26 +157,62 @@ Honest about what this does *not* do:
 - **Eligibility is open.** Anyone holding any secret key can check in once; the
   contract does not yet verify membership in an allowlist. Adding a Merkle-tree
   membership proof is the natural next step.
-- **Timing metadata.** The chain sees *when* each check-in transaction arrives.
-  A determined observer correlating submission times with other signals could
-  narrow down who submitted, even though the contract itself reveals nothing.
+- **Timing metadata.** The chain sees *when* each check-in transaction arrives,
+  and which wallet paid the fee. A determined observer correlating submission
+  times and fee-payers with other signals could narrow down who submitted, even
+  though the contract itself reveals nothing.
+
+### A note on identity
+
+Identity is derived from a hash of a private secret, **not** from
+`ownPublicKey()`. `ownPublicKey()` returns a prover-claimed value with no
+cryptographic binding to the transaction signer, so any access check built on it
+is bypassable. The admin role is `persistentHash("canary:admin:v1", secret)`,
+frozen into the ledger at construction.
 
 ## Tech Stack
 
 - **Midnight Network** — Preview testnet
 - **Compact** — language version 0.23.0 (compiler 0.31.1, `compact` CLI 0.5.1)
-- **Node.js** v22.23.2
-- **Docker** — `midnightntwrk/proof-server` on port 6300
-- `@midnight-ntwrk/compact-runtime` 0.16.0, `midnight-js` 4.1.1, `wallet-sdk` 1.2.0
+- **Midnight.js SDK** 4.1.1 — `midnight-js-contracts`, `-types`, `-protocol`,
+  `-indexer-public-data-provider`, `-fetch-zk-config-provider`,
+  `-level-private-state-provider`, `-network-id`, `-utils`
+- **DApp Connector API** `@midnight-ntwrk/dapp-connector-api` 4.0.1
+- **Lace wallet** — connection, local proof generation, fee payment, submission
+- **React 19 + Vite 8** — static frontend, no backend
+- **Fraunces** and **Sometype Mono**, both OFL-1.1 and **self-hosted** — a font
+  CDN would make the "no third-party requests" claim false
+- **Node.js** v22
 - **Vitest** 4.1 for the contract test suite
+
+### Interface
+
+The layout is the privacy model. The page is split by a labelled seam:
+everything left of it happens on your machine, everything right of it is public
+on-chain. Colour temperature, typeface and texture all flip at that seam — your
+side is dim and warm, the chain's side is bright and cold — so you can see which
+side your answer is on without being told. The seam is labelled with the only
+two things that ever cross it: **one hash, one bit**.
+
+The score you pick is never rendered after you pick it. The buttons are replaced
+by "Kept to yourself", and the value lives in a ref rather than React state, so
+it is absent from the DOM, from devtools snapshots, and from the profiler.
+
+Every text element meets WCAG AA contrast, touch targets are 46 px, focus is
+visible on keyboard navigation, and `prefers-reduced-motion` is respected.
 
 ## Prerequisites
 
-- **Linux or macOS.** Midnight does not support Windows natively — see the
-  Windows note below.
-- Node.js v22+
-- Docker (for the proof server)
-- The Compact toolchain:
+- **Lace wallet** installed, switched to **Preview**, and funded with tNIGHT from
+  https://faucet.preview.midnight.network/ (check-in is a transaction, so it
+  needs DUST generated from registered NIGHT)
+- **Node.js v22+**
+
+To build the contract from source you additionally need:
+
+- **Linux or macOS** (Midnight's toolchain does not support Windows natively —
+  see the Windows note below), Docker for the proof server, and the Compact
+  toolchain:
   ```bash
   curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
   ```
@@ -137,75 +221,75 @@ Honest about what this does *not* do:
   compact --version && compact compile --version
   ```
 
-### If you are on Windows — read this
+The frontend itself needs none of that — the compiled circuits are committed to
+`managed/`, so `npm install && npm run dev` works on any platform, Windows
+included.
 
-Two traps cost real time here, so they're documented for the next person:
-
-1. **Windows has its own `compact.exe`.** It's the built-in NTFS file-compression
-   tool. Running `compact --version` in PowerShell or Git Bash silently runs
-   *that*, prints something that isn't a version number, and looks like a broken
-   install. Build inside WSL2, where the name doesn't collide.
-2. **WSL inherits the Windows PATH.** A fresh Ubuntu shell can resolve `npm` to
-   `/mnt/c/Program Files/nodejs/npm` while `node` isn't found at all. Install
-   Node *inside* WSL (nvm) and verify with `which node npm` — both paths must be
-   under your Linux home.
-
-Also note that some tutorials reference an
-`npm install -g @midnight-ntwrk/compact-compiler` package and a
-`midnightnetwork/proof-server` Docker image. Neither exists — the npm package
-404s, and the Docker org is `midnightntwrk`.
-
-## Setup
+## Run Locally
 
 ```bash
-git clone <your-repo-url> canary
+git clone https://github.com/EkinOnat/midnight-canary.git canary
 cd canary
 npm install
 ```
 
-Start the proof server:
+```bash
+npm run dev
+```
+
+That's it — the app defaults to the live Preview contract in the table above, so
+there is nothing to configure. To point it at your own deployment instead, copy
+`.env.example` to `.env` and set `VITE_CONTRACT_ADDRESS` and
+`VITE_MIDNIGHT_NETWORK`.
+
+Open http://localhost:5173, connect Lace, pick a score, and check in.
+
+`npm run dev` first runs `scripts/copy-zk-assets.js`, which stages the prover
+keys and ZKIR from `managed/canary/` into `public/managed/canary/` where
+`FetchZkConfigProvider` can fetch them over HTTP. They are not committed —
+they're 5.4 MB of binaries regenerated from `managed/` on every run.
+
+### Deploy the contract
+
+Only needed if you want your own instance. Run this on Linux/macOS (or WSL2) with
+Docker running:
 
 ```bash
-docker run -d --name midnight-proof-server -p 6300:6300 midnightntwrk/proof-server:latest midnight-proof-server -v
-```
-
-Compile the contract:
-
-```bash
-npm run compile
-```
-
-This writes circuits, proving/verifying keys and ZKIR to `managed/canary/`, then
-prints what was built:
-
-```
-✓ Compiled contracts/canary.compact
-  language 0.23.0  |  compiler 0.31.1  |  runtime 0.16.0
-
-  CIRCUIT      KIND    PROOF     KEYS  ZKIR
-  -----------  ------  --------  ----  ----
-  deriveAdmin  pure    —
-  nullifier    pure    —
-  isAlert      pure    —
-  checkIn      impure  ZK proof  ✓     ✓
-  closeRound   impure  ZK proof  ✓     ✓
-
-  5 circuits (2 generating ZK proofs)
-```
-
-Deploy to Preview (prints a wallet address, then waits for you to fund it at
-https://midnight-tmnight-preview.nethermind.dev — it polls and continues by
-itself once the tNIGHT lands):
-
-```bash
+npm install
+docker compose up -d --wait proof-server
 npm run deploy -- --network preview
 ```
 
-Switch the active network at any time:
+The script prints a wallet address and then polls until you fund it from
+https://faucet.preview.midnight.network/ — it continues by itself once the
+tNIGHT lands. Confirm the result:
 
 ```bash
-npm run network preview
+npm run verify -- --network preview
 ```
+
+### Deploy the frontend
+
+The repo ships a [`vercel.json`](vercel.json). Note its SPA rewrite excludes
+`/managed/` — `FetchZkConfigProvider` hard-errors if a prover-key request comes
+back as `text/html`, which is what an unguarded catch-all fallback would return.
+
+```bash
+npx vercel link
+```
+
+```bash
+npx vercel --prod
+```
+
+No environment variables are needed — `src/config.ts` defaults to Preview and
+the contract address above. Set `VITE_MIDNIGHT_NETWORK` and
+`VITE_CONTRACT_ADDRESS` via `npx vercel env add ... production` only if you are
+hosting your own deployment.
+
+## Demo Video
+
+**[PLACEHOLDER — link to be added after recording]**
 
 ## Verify the Deployment
 
@@ -233,7 +317,7 @@ npm run verify -- --network preview
 That output is the *entire* public footprint of the contract. No score and no
 responder identity appears anywhere in it.
 
-## Interact With It
+## Interact From the CLI
 
 ```bash
 npm run cli
@@ -242,6 +326,10 @@ npm run cli
 Private check-in, a public-pulse view, and an admin close-round action. Your
 responder identity is derived locally from a passphrase you type, so a single
 operator can exercise a multi-person round.
+
+`closeRound()` is CLI-only by design: it is gated on a hash of the *deployer's*
+secret, which a Lace key cannot produce, so exposing it in the browser would only
+ever fail.
 
 ## Run Tests
 
@@ -264,14 +352,104 @@ no node, proof server or funded wallet needed:
    public state; scores 1 and 4 differ in the `alerts` counter and *nothing else*;
    no raw secret key ever appears in public state.
 
+## How the Browser Talks to Midnight
+
+`@midnight-ntwrk/dapp-connector-api` v4 replaced the older
+`window.midnight.mnLace.enable()` shape. Wallets now inject one or more
+`InitialAPI` objects under `window.midnight`, and the dApp picks one and calls
+`connect(networkId)`. Midnight.js wants six providers; four are off-the-shelf and
+two are the adapter in [`src/lib/providers.ts`](src/lib/providers.ts):
+
+| Provider | Implementation |
+|---|---|
+| `zkConfigProvider` | `FetchZkConfigProvider` → `/managed/canary/{keys,zkir}/` |
+| `proofProvider` | `createProofProvider(await api.getProvingProvider(...))` — **proving runs in the wallet, locally** |
+| `publicDataProvider` | `indexerPublicDataProvider`, pointed at whichever indexer the wallet reports |
+| `privateStateProvider` | `levelPrivateStateProvider`, encrypted, scoped per wallet address |
+| `walletProvider` | `balanceTx` → `api.balanceUnsealedTransaction` |
+| `midnightProvider` | `submitTx` → `api.submitTransaction` |
+
+Transaction encoding across that boundary is isolated in
+[`src/lib/tx-codec.ts`](src/lib/tx-codec.ts).
+
+Two notes for anyone following the Rise In brief literally:
+
+- `@midnight-ntwrk/midnight-js-network-provider` **does not exist** on npm. The
+  packages you actually want are `midnight-js-fetch-zk-config-provider` and
+  `midnight-js-indexer-public-data-provider`.
+- `enable()` / `serviceUriConfig()` are from connector API v1–v3. On v4 the
+  equivalents are `connect()` and `getConfiguration()`.
+
+### If you are on Windows — read this
+
+Two traps cost real time here, so they're documented for the next person. Both
+apply to *building the contract*; the frontend runs fine on Windows.
+
+1. **Windows has its own `compact.exe`.** It's the built-in NTFS file-compression
+   tool. Running `compact --version` in PowerShell or Git Bash silently runs
+   *that*, prints something that isn't a version number, and looks like a broken
+   install. Build inside WSL2, where the name doesn't collide.
+2. **WSL inherits the Windows PATH.** A fresh Ubuntu shell can resolve `npm` to
+   `/mnt/c/Program Files/nodejs/npm` while `node` isn't found at all. Install
+   Node *inside* WSL (nvm) and verify with `which node npm` — both paths must be
+   under your Linux home.
+
+Also note that some tutorials reference an
+`npm install -g @midnight-ntwrk/compact-compiler` package and a
+`midnightnetwork/proof-server` Docker image. Neither exists — the npm package
+404s, and the Docker org is `midnightntwrk`.
+
+## Compile the Contract
+
+```bash
+npm run compile
+```
+
+This writes circuits, proving/verifying keys and ZKIR to `managed/canary/`, then
+prints what was built:
+
+```
+✓ Compiled contracts/canary.compact
+  language 0.23.0  |  compiler 0.31.1  |  runtime 0.16.0
+
+  CIRCUIT      KIND    PROOF     KEYS  ZKIR
+  -----------  ------  --------  ----  ----
+  deriveAdmin  pure    —
+  nullifier    pure    —
+  isAlert      pure    —
+  checkIn      impure  ZK proof  ✓     ✓
+  closeRound   impure  ZK proof  ✓     ✓
+
+  5 circuits (2 generating ZK proofs)
+```
+
 ## Project Structure
 
 ```
 .
 ├── contracts/canary.compact     the Compact contract
 ├── managed/canary/              compiler output: circuits, keys, ZKIR
+├── public/                      static assets (managed/ staged here at build time)
+├── index.html                   Vite entry point
+├── vite.config.ts               WASM + Buffer polyfill config for Midnight in the browser
+├── vercel.json                  static hosting config
 ├── src/
-│   ├── witnesses.ts             private state + witness implementations
+│   ├── main.tsx                 React entry
+│   ├── App.tsx                  page layout
+│   ├── config.ts                network + contract address from VITE_ env vars
+│   ├── components/
+│   │   ├── WalletConnect.tsx    wallet connect/disconnect UI
+│   │   └── CircuitCall.tsx      checkIn button, masked score entry, result display
+│   ├── hooks/
+│   │   └── useMidnight.ts       Midnight.js SDK hook: session, providers, contract
+│   ├── lib/
+│   │   ├── connector.ts         Lace discovery, connect, error mapping
+│   │   ├── providers.ts         ConnectedAPI → Midnight.js provider set
+│   │   ├── canary.ts            compiled-contract binding + ledger decoding
+│   │   ├── identity.ts          local identity secret + storage password
+│   │   ├── tx-codec.ts          transaction encoding across the connector boundary
+│   │   └── progress.ts          call-phase signalling for the loading state
+│   ├── witnesses.ts             private state + witness implementations (shared with CLI)
 │   ├── deploy.ts                deployment script
 │   ├── verify.ts                reads public state back off the indexer
 │   ├── cli.ts                   check in, read the pulse, close a round
@@ -279,7 +457,9 @@ no node, proof server or funded wallet needed:
 ├── tests/
 │   ├── canary-simulator.ts      in-process test harness
 │   └── canary.test.ts           the test suite
-├── scripts/compile-summary.js   renders the circuit table after compiling
+├── scripts/
+│   ├── compile-summary.js       renders the circuit table after compiling
+│   └── copy-zk-assets.js        stages ZK artifacts for the browser
 ├── screenshots/                 submission evidence
 ├── .github/workflows/           CI/CD (Level 3)
 └── README.md
@@ -321,9 +501,9 @@ circuits are helpers that get inlined and need no proof of their own.
 
 ### Contract deployed — address and live on-chain state
 
-`npm run verify -- --network preview`. The address is read from the deployment
-record, then the contract's public state is fetched back off the Preview indexer
-to confirm it is genuinely live.
+`npm run verify`. The address is read from the deployment record, then the
+contract's public state is fetched back off the indexer to confirm it is
+genuinely live.
 
 Note what the public state contains: two counters, a threshold, a nullifier count
 and an admin hash. No wellbeing score and no responder identity appears anywhere
