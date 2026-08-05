@@ -204,8 +204,11 @@ a:hover {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lamp) 22%, transparent);
 }
 
+/* Wide enough that the visible portion identifies the account rather than just
+   showing the network prefix every Preview address shares. The full value is
+   in a title attribute. */
 .trunc {
-  max-width: 15ch;
+  max-width: 28ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
