@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canary — an anonymous pulse for teams</title>
+    <meta
+      name="description"
+      content="Submit a private wellbeing score on Midnight. The chain learns how many people are struggling — never who, and never their score."
+    />
+    <meta name="theme-color" content="#1b1a22" />
+    <!-- Self-hosted, so the page makes no third-party requests. Preloaded
+         because both faces are used above the fold. -->
+    <link
+      rel="preload"
+      href="/fonts/fraunces-var-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/sometype-mono-var-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
