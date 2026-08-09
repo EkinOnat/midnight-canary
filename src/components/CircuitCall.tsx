@@ -20,6 +20,7 @@ import { createCanaryPrivateState, scrubbedPrivateState } from '../lib/canary';
 import { getIdentitySecret, identityFingerprint, rotateIdentitySecret } from '../lib/identity';
 import { PHASE_LABELS, PHASE_ORDER, onCallPhase, type CallPhase } from '../lib/progress';
 import { describeWalletError, errorDetail } from '../lib/connector';
+import { classifyDust } from '../lib/dust';
 
 const SCORES = [1, 2, 3, 4, 5] as const;
 const CROSSING_MS = 1200;
@@ -36,7 +37,8 @@ export function CircuitCall({
   session: MidnightSession;
   children?: ReactNode;
 }) {
-  const { status, contract, providers, pulse, pulseError, refreshPulse } = session;
+  const { status, contract, providers, pulse, pulseError, refreshPulse, dust, refreshDust } =
+    session;
 
   // The private score. A ref, not state: state would be rendered, retained in
   // devtools, and captured by React's profiler.
@@ -52,6 +54,8 @@ export function CircuitCall({
 
   const running = phase !== null;
   const connected = status === 'connected' && contract !== null && providers !== null;
+  // Null when the wallet does not report a balance — unknown, not empty.
+  const fee = dust ? classifyDust(dust) : null;
 
   useEffect(() => onCallPhase(setPhase), []);
 
@@ -99,6 +103,19 @@ export function CircuitCall({
 
     setCallError(null);
     setReceipt(null);
+
+    // Ask the wallet whether it can pay before doing a minute of proving. DUST
+    // accrues, so this is re-read rather than trusted from connect time — a
+    // wallet that could not pay five minutes ago may be able to now.
+    const funds = await refreshDust();
+    if (funds) {
+      const verdict = classifyDust(funds);
+      if (!verdict.canPay) {
+        setCallError({ message: `${verdict.message} ${verdict.hint}`, detail: null });
+        return;
+      }
+    }
+
     setPhase('executing');
 
     try {
@@ -130,7 +147,7 @@ export function CircuitCall({
       }
       setPhase(null);
     }
-  }, [connected, contract, providers, refreshPulse]);
+  }, [connected, contract, providers, refreshPulse, refreshDust]);
 
   const phaseIndex = PHASE_ORDER.findIndex((p) => p === phase);
 
@@ -223,6 +240,16 @@ export function CircuitCall({
 
         {!connected && status !== 'connecting' ? (
           <p className="phases">Connect a wallet to check in.</p>
+        ) : null}
+
+        {/* Shown before anything is picked, because it is not something the
+            person can fix in the moment — DUST has to accrue. Better to know
+            while reading the page than after committing to an answer. */}
+        {connected && !running && fee && !fee.canPay ? (
+          <div className="phases">
+            <p className="call-error">{fee.message}</p>
+            <p className="kept-note">{fee.hint}</p>
+          </div>
         ) : null}
 
         {callError ? (

@@ -175,6 +175,7 @@ export async function connectWallet(
       'getConfiguration',
       'getShieldedAddresses',
       'getUnshieldedAddress',
+      'getDustBalance',
       'getProvingProvider',
       'balanceUnsealedTransaction',
       'submitTransaction',

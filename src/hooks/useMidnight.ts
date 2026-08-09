@@ -22,6 +22,7 @@ import {
 import { buildProviders, publicDataProviderFor, type CanaryProviders } from '../lib/providers';
 import type { PublicDataProvider } from '@midnight-ntwrk/midnight-js-types';
 import { compiledContract, readPulse, scrubbedPrivateState, type PublicPulse } from '../lib/canary';
+import type { DustStatus } from '../lib/dust';
 
 export type ConnectionStatus = 'idle' | 'detecting' | 'connecting' | 'connected' | 'error';
 
@@ -40,9 +41,13 @@ export interface MidnightSession {
   readonly targetNetwork: string;
   readonly pulse: PublicPulse | null;
   readonly pulseError: string | null;
+  /** Whether the wallet can pay a fee. Null until connected, or if unreadable. */
+  readonly dust: DustStatus | null;
   connect(wallet?: DiscoveredWallet): Promise<void>;
   disconnect(): void;
   refreshPulse(): Promise<void>;
+  /** Re-read the DUST balance — it accrues, so a failed check can later pass. */
+  refreshDust(): Promise<DustStatus | null>;
   /** Available once connected; used by `CircuitCall` to invoke `checkIn`. */
   readonly providers: CanaryProviders | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,6 +69,7 @@ export function useMidnight(): MidnightSession {
   const [contract, setContract] = useState<any | null>(null);
   const [pulse, setPulse] = useState<PublicPulse | null>(null);
   const [pulseError, setPulseError] = useState<string | null>(null);
+  const [dust, setDust] = useState<DustStatus | null>(null);
 
   const apiRef = useRef<ConnectedAPI | null>(null);
   const providersRef = useRef<CanaryProviders | null>(null);
@@ -138,6 +144,7 @@ export function useMidnight(): MidnightSession {
     // away.
     setWalletName(null);
     setWalletIcon(null);
+    setDust(null);
     setError(null);
     setErrorHint(null);
     setStatus('idle');
@@ -193,6 +200,10 @@ export function useMidnight(): MidnightSession {
         setWalletIcon(wallet.icon || null);
         setStatus('connected');
 
+        // Read it now so the page can say up front that a check-in cannot be
+        // paid for, rather than after a minute of proving.
+        setDust(await connection.api.getDustBalance().catch(() => null));
+
         await readPulseFrom(built.providers.publicDataProvider);
       } catch (e) {
         apiRef.current = null;
@@ -217,6 +228,19 @@ export function useMidnight(): MidnightSession {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readPulseFrom]);
 
+  /**
+   * A wallet that cannot report its DUST is treated as unknown rather than
+   * empty: the check exists to save someone a minute of pointless proving, so
+   * it must never be the thing that blocks a check-in that would have worked.
+   */
+  const refreshDust = useCallback(async (): Promise<DustStatus | null> => {
+    const api = apiRef.current;
+    if (!api) return null;
+    const next = await api.getDustBalance().catch(() => null);
+    setDust(next);
+    return next;
+  }, []);
+
   return {
     status,
     error,
@@ -231,9 +255,11 @@ export function useMidnight(): MidnightSession {
     targetNetwork: TARGET_NETWORK,
     pulse,
     pulseError,
+    dust,
     connect,
     disconnect,
     refreshPulse,
+    refreshDust,
     providers,
     contract,
   };
