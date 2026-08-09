@@ -403,11 +403,30 @@ confirm the contract is real only ever ran for whoever deployed it. Pass
 
 > **Why `-- preview` and not `-- --network preview`.** npm on Windows parses
 > `--network` as one of its own config options, warns `Unknown cli config
-> "--network"`, and passes only the bare word through. The script then saw no
-> network, fell back to `undeployed` — whose endpoints are all localhost — and
-> hung retrying against a dead socket. Every script here accepts a bare network
-> name for that reason, and `--network preview` still works where the shell
-> permits it.
+> "--network"`, and passes only the bare word through, so the script saw no
+> network at all. Every script here accepts a bare network name for that
+> reason, and `--network preview` still works where the shell permits it.
+
+### Which network a command targets
+
+An explicit argument wins, then the active network recorded in
+`.midnight-state.json`, then **Preview** as the default. So `npm run verify` on
+its own works from a fresh clone.
+
+The default used to be `undeployed`, whose endpoints are all localhost. On a
+clone with no state file that meant any command run without an argument aimed
+at a devnet that was not running and retried against a dead socket forever — no
+error, no timeout, just a spinner. It needed no mistake to hit; omitting the
+argument was enough. Preview is the better default because it is where this
+project is actually deployed, and because being wrong about it fails
+immediately instead of hanging.
+
+Running against a local devnet is the deliberate act, so it is the one that now
+names its network:
+
+```bash
+npm run setup -- undeployed
+```
 
 ```
   Network:      preview

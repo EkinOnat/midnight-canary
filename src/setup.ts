@@ -26,9 +26,13 @@ async function main(): Promise<void> {
   // 2. Compile the contract (network-agnostic).
   run('npm', ['run', 'compile']);
 
-  // 3. Deploy. Forward --network so deploy.ts sees the same network.
-  const deployArgs = network === 'undeployed' ? [] : ['--', '--network', network];
-  run('npm', ['run', 'deploy', ...deployArgs]);
+  // 3. Deploy, naming the network rather than letting deploy.ts resolve its
+  //    own. It is forwarded as a positional because npm on Windows claims
+  //    `--network` as one of its own config options and drops it, and it is
+  //    always forwarded — the `undeployed` case used to pass nothing and lean
+  //    on the default, which is exactly the kind of coupling that broke when
+  //    the default changed.
+  run('npm', ['run', 'deploy', '--', network]);
 }
 
 main().catch((e) => {

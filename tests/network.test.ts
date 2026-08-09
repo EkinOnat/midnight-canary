@@ -12,7 +12,10 @@
  * exactly as documented, did something other than what it said.
  */
 import { describe, it, expect } from 'vitest';
-import { parseNetworkFlag } from '../src/network.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { DEFAULT_NETWORK, parseNetworkFlag, resolveNetwork } from '../src/network.js';
 
 /** argv as Node builds it: [execPath, scriptPath, ...args]. */
 const argv = (...args: string[]) => ['node', 'src/verify.ts', ...args];
@@ -63,5 +66,59 @@ describe('network argument', () => {
 
   it('ignores a stray word that is not a network id', () => {
     expect(parseNetworkFlag(argv('somethingelse'))).toBeNull();
+  });
+});
+
+/**
+ * What a command does when nothing tells it where to point.
+ *
+ * The default used to be `undeployed`, whose endpoints are all localhost, so
+ * on a fresh clone `npm run verify` with no argument silently aimed at a
+ * devnet that was not running and retried forever. No mistake was needed to
+ * hit it — omitting the argument was enough.
+ */
+describe('default network', () => {
+  /** An empty directory, so there is no state file to resolve from. */
+  const freshClone = () => fs.mkdtempSync(path.join(os.tmpdir(), 'canary-net-'));
+
+  it('is preview, not a localhost devnet', () => {
+    expect(DEFAULT_NETWORK).toBe('preview');
+  });
+
+  it('points a fresh clone at a network that actually exists', () => {
+    const cwd = freshClone();
+    try {
+      const r = resolveNetwork({ argv: argv(), cwd, env: {} });
+      expect(r.network).toBe('preview');
+      expect(r.source).toBe('default');
+      // The specific regression: every endpoint on the old default was
+      // loopback, so nothing failed — it just never connected.
+      expect(r.config.indexer).not.toMatch(/127\.0\.0\.1|localhost/);
+      expect(r.config.node).not.toMatch(/127\.0\.0\.1|localhost/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('still reaches the local devnet when asked for it by name', () => {
+    const cwd = freshClone();
+    try {
+      const r = resolveNetwork({ argv: argv('undeployed'), cwd, env: {} });
+      expect(r.network).toBe('undeployed');
+      expect(r.source).toBe('flag');
+      expect(r.config.indexer).toMatch(/127\.0\.0\.1/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('reports where the choice came from, so a default is never mistaken for a decision', () => {
+    const cwd = freshClone();
+    try {
+      expect(resolveNetwork({ argv: argv(), cwd, env: {} }).source).toBe('default');
+      expect(resolveNetwork({ argv: argv('preprod'), cwd, env: {} }).source).toBe('flag');
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

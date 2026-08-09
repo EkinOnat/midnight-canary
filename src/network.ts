@@ -222,6 +222,26 @@ function applyEnvOverrides(base: NetworkConfig, env: NodeJS.ProcessEnv): Network
   return out;
 }
 
+/**
+ * The network every script runs against, and where that choice came from.
+ *
+ * Precedence: an explicit argument, then the active network in
+ * `.midnight-state.json`, then {@link DEFAULT_NETWORK}.
+ *
+ * That last step used to be `undeployed`, whose endpoints are all localhost.
+ * On a fresh clone there is no state file, so any command run without an
+ * argument aimed at a devnet that was not running and retried against a dead
+ * socket indefinitely — no error, no timeout, just a spinner. The trap was
+ * easy to fall into precisely because it needed no mistake: `npm run verify`
+ * on its own was enough.
+ *
+ * Preview is the better default because it is where this project is actually
+ * deployed, and because being wrong about it fails loudly and immediately
+ * rather than hanging. Running a local devnet is the deliberate act, so it is
+ * the one that now names its network.
+ */
+export const DEFAULT_NETWORK: NetworkId = 'preview';
+
 export function resolveNetwork(opts: ResolveOptions = {}): ResolveResult {
   const argv = opts.argv ?? process.argv;
   const env = opts.env ?? process.env;
@@ -240,7 +260,7 @@ export function resolveNetwork(opts: ResolveOptions = {}): ResolveResult {
       network = state.activeNetwork;
       source = 'state';
     } else {
-      network = 'undeployed';
+      network = DEFAULT_NETWORK;
       source = 'default';
     }
   }
