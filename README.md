@@ -235,7 +235,7 @@ The frontend itself needs none of that — the compiled circuits are committed t
 `managed/`, so `npm install && npm run dev` works on any platform, Windows
 included.
 
-## Run Locally
+## Setup & Run Locally
 
 ```bash
 git clone https://github.com/EkinOnat/midnight-canary.git canary
@@ -297,6 +297,67 @@ the contract address above. Set `VITE_MIDNIGHT_NETWORK` and
 `VITE_CONTRACT_ADDRESS` via `npx vercel env add ... production` only if you are
 hosting your own deployment.
 
+## Run Tests
+
+```
+npm test
+```
+
+35 tests, run against the real compiled contract in-process — no node, proof
+server or funded wallet needed. 24 cover the contract and 11 cover the wallet
+connector.
+
+`tests/canary-simulator.ts` drives the generated circuits through a local
+`QueryContext`, so these exercise the actual ZK logic rather than a mock of it.
+
+**Contract — `tests/canary.test.ts`**
+
+1. **Circuit logic** — the nullifier is deterministic, round-scoped, unlinkable
+   across rounds, and domain-separated from the admin commitment; `isAlert`
+   classifies correctly on both sides of the threshold.
+2. **State transitions** — check-ins increment `responses`; only scores at or
+   below the threshold also increment `alerts`; out-of-range scores are rejected.
+3. **Double check-in** — a second check-in in the same round is refused and the
+   tally is left untouched.
+4. **Round rollover and access control** — the admin can close a round (clearing
+   counters and nullifiers); a non-admin cannot.
+5. **Private inputs are never exposed** — scores 4 and 5 produce byte-identical
+   public state; scores 1 and 4 differ in the `alerts` counter and *nothing else*;
+   no raw secret key ever appears in public state.
+
+**Connector — `tests/connector.test.ts`**
+
+6. **Wallet error mapping** — every string in these assertions came out of a real
+   Lace 4.0.1 wallet. Lace reports a network disagreement as a plain `Error`, so
+   message text is the only thing available to branch on, and a silent regression
+   would replace an actionable instruction with a raw stack trace at exactly the
+   moment someone is trying to connect.
+
+## CI/CD
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
+`main` and on every pull request against it. Two jobs, both required for the
+badge at the top of this file to be green:
+
+| Job | Steps | Why it is separate |
+|---|---|---|
+| **Test & build** | checkout → Node 22 → `npm ci` → `npm test` → `npm run build` | Needs only Node, so it reports in about 25 seconds. The build step is what proves the dApp compiles with zero errors. |
+| **Compact compile** | checkout → Node 22 → `npm ci` → install the Compact toolchain → `compact update` → `npm run compile` | Has to download the Compact toolchain from an upstream release, which is slower and can fail for reasons unrelated to this repo. Split out, a toolchain outage reads differently from a broken test. |
+
+The compile job installs the same toolchain the Prerequisites section documents,
+then runs the real compiler — it is not a cached artifact check. Its log prints
+the circuit table from [`scripts/compile-summary.js`](scripts/compile-summary.js),
+which fails the job if any ZK circuit is missing its prover key, verifier key or
+ZKIR.
+
+`managed/` is committed, so the frontend job never needs the Compact toolchain —
+which is also why `npm install && npm run dev` works on Windows.
+
+## Product Proposal
+
+See [PROPOSAL.md](PROPOSAL.md) — what the product is, who uses it, why it needs
+Midnight specifically, the public/private data model, and the path to Mainnet.
+
 ## Demo Video
 
 **https://youtu.be/biNR6PxyLR4**
@@ -345,27 +406,6 @@ operator can exercise a multi-person round.
 `closeRound()` is CLI-only by design: it is gated on a hash of the *deployer's*
 secret, which a Lace key cannot produce, so exposing it in the browser would only
 ever fail.
-
-## Run Tests
-
-```bash
-npm test
-```
-
-24 tests across five areas, run against the real compiled contract in-process —
-no node, proof server or funded wallet needed:
-
-1. **Circuit logic** — the nullifier is deterministic, round-scoped, unlinkable
-   across rounds, and domain-separated from the admin commitment.
-2. **State transitions** — check-ins increment `responses`; only scores at or
-   below the threshold also increment `alerts`; out-of-range scores are rejected.
-3. **Double check-in** — a second check-in in the same round is refused and the
-   tally is left untouched.
-4. **Round rollover and access control** — the admin can close a round (clearing
-   counters and nullifiers); a non-admin cannot.
-5. **Private inputs are never exposed** — scores 4 and 5 produce byte-identical
-   public state; scores 1 and 4 differ in the `alerts` counter and *nothing else*;
-   no raw secret key ever appears in public state.
 
 ## How the Browser Talks to Midnight
 
