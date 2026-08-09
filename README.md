@@ -1,5 +1,7 @@
 # Canary
 
+[![CI](https://github.com/EkinOnat/midnight-canary/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EkinOnat/midnight-canary/actions/workflows/ci.yml)
+
 > An anonymous early-warning pulse for teams: members submit a private wellbeing score from their browser, and the chain learns only how many people are struggling — never who, and never their score.
 
 ## Live Demo
