@@ -213,10 +213,28 @@ screen readers routinely miss.
 
 ## Prerequisites
 
-- **Lace wallet** installed, switched to **Preview**, and funded with tNIGHT from
-  https://faucet.preview.midnight.network/ (check-in is a transaction, so it
-  needs DUST generated from registered NIGHT)
+- **Lace wallet** installed, switched to **Preview**, funded, **and generating
+  DUST** — see below
 - **Node.js v22+**
+
+### Funding is two steps, not one
+
+This catches people out, so it is worth being explicit. Fees on Midnight are
+paid in **DUST**, and the faucet does not hand out DUST — it hands out tNIGHT.
+DUST cannot be sent or bought; it is *generated* by NIGHT that you have
+delegated to a DUST address, and it accrues over time.
+
+1. Get tNIGHT from https://faucet.preview.midnight.network/ using your
+   **unshielded** address.
+2. In Lace, use **"Generate tDUST"** to delegate that tNIGHT, and confirm the
+   transaction. Generation starts about a minute later (three blocks) and builds
+   from there.
+
+A wallet holding tNIGHT with zero tDUST looks funded and is not. It will run the
+circuit, generate the proof, and even balance and sign the transaction — the
+network only refuses it at submission. The dApp now checks the DUST balance
+before proving and says which of the two steps is missing, rather than spending
+a minute to fail.
 
 To build the contract from source you additionally need:
 
