@@ -400,16 +400,34 @@ npm run verify -- --network preview
 
   ── Public ledger state ─────────────────────
   round             1
-  responses         0
+  responses         1
   alerts            0
   alertThreshold    score <= 2
-  checkedIn         0 nullifier(s)
+  checkedIn         1 nullifier(s)
   admin             1b0b3de87b0445af770d7f10...
   ────────────────────────────────────────────
 ```
 
 That output is the *entire* public footprint of the contract. No score and no
 responder identity appears anywhere in it.
+
+It is also a live check-in rather than a fresh deployment, which makes it a
+sharper demonstration of the privacy model than an empty contract would be.
+Someone answered — `responses` is 1, and a nullifier is recorded so they cannot
+answer again this round. `alerts` is 0, so their score was above the threshold:
+a 3, a 4 or a 5. **Which of the three is not recoverable from anything above**,
+and neither is who they were. The nullifier is a one-way hash of a secret that
+never left their browser, and it is not derived from the wallet that paid the
+fee. One bit crossed the boundary, which is exactly what the contract promises.
+
+The call is verifiable independently of this repo — the most recent contract
+action at that address is a `ContractCall` in block 349680:
+
+```bash
+curl -s -X POST https://indexer.preview.midnight.network/api/v4/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"{ contractAction(address: \"713e14035854aee952c8f2c56f2b871f14f1ce8a8b59d2fa96e51f9d2204bbc8\") { __typename transaction { hash block { height } } } }"}'
+```
 
 ## Interact From the CLI
 
@@ -585,3 +603,7 @@ and an admin hash. No wellbeing score and no responder identity appears anywhere
 in it — which is the whole point of the contract.
 
 ![Deployment check showing the contract address and its public ledger state](screenshots/02-contract-deployed.png)
+
+This was taken the day the contract went up, so its counters are all zero. The
+[Verify the Deployment](#verify-the-deployment) section above shows the same
+command against the contract as it stands now, with a check-in recorded.
