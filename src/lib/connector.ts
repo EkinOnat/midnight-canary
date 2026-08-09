@@ -194,6 +194,71 @@ export async function connectWallet(
   return { wallet, api, networkId: status.networkId };
 }
 
+/**
+ * Every message in an error's `cause` chain, outermost first.
+ *
+ * Midnight.js wraps failures as `new Error(summary, { cause: err })`, and its
+ * own summary interpolates the cause with `String(err)`. When the underlying
+ * error has an empty message — which the Effect-based internals routinely
+ * produce — that interpolation renders as the bare word "Error", so reading
+ * only `.message` shows the user a sentence ending in ": Error" while the
+ * actual reason sits one link down the chain. This walks the chain instead.
+ *
+ * Effect's errors are also handled: they carry the real detail as a plain
+ * `{ name, message }` object on `cause` rather than as a nested `Error`.
+ */
+function messageChain(e: unknown, seen = new Set<unknown>()): string[] {
+  // `cause` chains are not guaranteed acyclic, and a cycle here would hang the
+  // error handler — the one place that must not throw.
+  if (e === null || typeof e !== 'object' || seen.has(e)) return [];
+  seen.add(e);
+
+  const self = typeof (e as { message?: unknown }).message === 'string'
+    ? ((e as { message: string }).message).trim()
+    : '';
+  const rest = messageChain((e as { cause?: unknown }).cause, seen);
+  return self ? [self, ...rest] : rest;
+}
+
+/**
+ * Whether a message states a reason, or only that something failed.
+ *
+ * `String(err)` on an Error with an empty message yields the bare word
+ * "Error", so any wrapper that interpolated its cause that way ends in
+ * ": Error" and names no reason at all — it is the degraded form, and showing
+ * it is what produced "…scoped transaction '<unnamed>': Error" on screen. A
+ * wrapper whose cause did have a message keeps that text, and the inner link
+ * carries the same words anyway, so nothing is lost by dropping these.
+ */
+function statesAReason(message: string): boolean {
+  return message !== '' && message !== 'Error' && !/:\s*Error$/.test(message);
+}
+
+/**
+ * The most specific message available for an error.
+ *
+ * The innermost link is the actual failure; everything above it is a wrapper
+ * restating it. Returns null when no link states a reason, so the caller can
+ * fall back to language written for its own context rather than showing
+ * library jargon.
+ */
+export function deepestMessage(e: unknown): string | null {
+  const chain = messageChain(e).filter(statesAReason);
+  return chain.length > 0 ? chain[chain.length - 1] : null;
+}
+
+/**
+ * Every message in the chain, outermost first, for display as raw detail.
+ *
+ * Unlike {@link deepestMessage} this keeps the uninformative wrappers: they
+ * name the stage that failed, which is the first thing worth knowing when
+ * diagnosing one of these.
+ */
+export function errorDetail(e: unknown): string | null {
+  const chain = messageChain(e);
+  return chain.length > 0 ? chain.join('  ←  ') : null;
+}
+
 /** Turn any post-connection connector failure into a readable message. */
 export function describeWalletError(e: unknown, fallback: string): string {
   const apiErr = asApiError(e);
@@ -210,5 +275,5 @@ export function describeWalletError(e: unknown, fallback: string): string {
         return apiErr.reason || fallback;
     }
   }
-  return e instanceof Error ? e.message : fallback;
+  return deepestMessage(e) ?? fallback;
 }

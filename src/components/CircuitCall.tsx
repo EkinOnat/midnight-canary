@@ -19,7 +19,7 @@ import { PRIVATE_STATE_ID } from '../config';
 import { createCanaryPrivateState, scrubbedPrivateState } from '../lib/canary';
 import { getIdentitySecret, identityFingerprint, rotateIdentitySecret } from '../lib/identity';
 import { PHASE_LABELS, PHASE_ORDER, onCallPhase, type CallPhase } from '../lib/progress';
-import { describeWalletError } from '../lib/connector';
+import { describeWalletError, errorDetail } from '../lib/connector';
 
 const SCORES = [1, 2, 3, 4, 5] as const;
 const CROSSING_MS = 1200;
@@ -45,7 +45,7 @@ export function CircuitCall({
 
   const [phase, setPhase] = useState<CallPhase | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [callError, setCallError] = useState<string | null>(null);
+  const [callError, setCallError] = useState<CallFailure | null>(null);
   const [crossing, setCrossing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fingerprint, setFingerprint] = useState(() => identityFingerprint(getIdentitySecret()));
@@ -226,9 +226,18 @@ export function CircuitCall({
         ) : null}
 
         {callError ? (
-          <p className="phases" role="alert">
-            {callError}
-          </p>
+          <div className="phases" role="alert">
+            <p className="call-error">{callError.message}</p>
+            {/* Collapsed rather than hidden. The sentence above is what to do;
+                this is what happened, and it is the only thing worth pasting
+                into a bug report. */}
+            {callError.detail ? (
+              <details className="call-detail">
+                <summary>What the wallet reported</summary>
+                <code className="wrapcode">{callError.detail}</code>
+              </details>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="kept">
@@ -317,16 +326,79 @@ export function CircuitCall({
   );
 }
 
-function explainCallError(e: unknown): string {
-  const message = describeWalletError(e, 'The circuit call did not complete.');
-  if (/already checked in/i.test(message)) {
-    return 'This identity already checked in for the current round. Use “New identity” to check in as a different responder.';
+/**
+ * The user-facing sentence, and the raw detail behind it.
+ *
+ * Both are returned because they answer different questions. The sentence says
+ * what to do next; the detail says what actually happened, and is the only
+ * thing worth pasting into a bug report. Collapsing them into one string, as
+ * this did originally, meant an unrecognised failure showed the wrapper's
+ * summary — which for Midnight.js is a sentence ending in ": Error" — and the
+ * real cause was never displayed at all.
+ */
+interface CallFailure {
+  readonly message: string;
+  readonly detail: string | null;
+}
+
+function explainCallError(e: unknown): CallFailure {
+  const raw = describeWalletError(e, 'The circuit call did not complete.');
+  // The full chain, wrappers included — they name the stage that failed, which
+  // is the first thing worth knowing when diagnosing one of these.
+  const detail = errorDetail(e);
+  const say = (message: string): CallFailure => ({ message, detail });
+
+  if (/already checked in/i.test(raw)) {
+    return {
+      message:
+        'This identity already checked in for the current round. Use “New identity” to check in as a different responder.',
+      detail: null,
+    };
   }
-  if (/Not enough Dust|Insufficient Funds|could not balance/i.test(message)) {
-    return 'The wallet has no DUST to pay the fee. Fund it from the faucet and register NIGHT for DUST generation.';
+  if (/Not enough Dust|Insufficient Funds|could not balance|no dust/i.test(raw)) {
+    return say(
+      'The wallet has no DUST to pay the fee. Fund it from the faucet, register the NIGHT for DUST generation, and wait for the balance to appear.',
+    );
   }
-  if (/Failed to fetch ZK artifact|text\/html/i.test(message)) {
-    return 'Could not load the proving keys from /managed/canary/. Check that the ZK artifacts shipped alongside the site.';
+  if (/Failed to fetch ZK artifact|text\/html/i.test(raw)) {
+    return say(
+      'Could not load the proving keys from /managed/canary/. Check that the ZK artifacts shipped alongside the site.',
+    );
   }
-  return message;
+
+  // The node applied the transaction and rejected it. Distinct from a failure
+  // to submit: the fee was spent, so the wallet balance moved even though the
+  // check-in did not land.
+  const status = txStatusOf(e);
+  if (status && status !== 'SucceedEntirely') {
+    return say(
+      `The network rejected the transaction (${status}). The most common cause on Preview is not having enough DUST to cover the fee at the moment it was applied.`,
+    );
+  }
+
+  // Submission specifically — the proof was generated and the wallet signed
+  // and balanced the transaction, so the failure is between the wallet and the
+  // node rather than anything to do with the score.
+  if (/error submitting scoped transaction/i.test(rawOuter(e))) {
+    return say(
+      'The proof was generated and the wallet signed the transaction, but the network did not accept it. Check that the wallet holds DUST — not just NIGHT — and that it is still on Preview, then try again.',
+    );
+  }
+
+  return say(raw);
+}
+
+/** The outermost message, used only to identify which stage the wrapper names. */
+function rawOuter(e: unknown): string {
+  return e instanceof Error ? e.message : '';
+}
+
+/** `TxFailedError` carries the node's verdict on a transaction it did apply. */
+function txStatusOf(e: unknown): string | null {
+  for (let cur: unknown = e, hops = 0; cur && hops < 8; hops++) {
+    const status = (cur as { finalizedTxData?: { status?: unknown } }).finalizedTxData?.status;
+    if (typeof status === 'string') return status;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return null;
 }

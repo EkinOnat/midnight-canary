@@ -541,6 +541,33 @@ a:hover {
   font-size: 0.74rem;
 }
 
+/* The failure sentence. Ember rather than the muted grey the phase list uses —
+   a failed check-in is not a progress update. */
+.call-error {
+  margin: 0;
+  color: var(--ember);
+  line-height: 1.55;
+}
+
+.call-detail {
+  margin-top: 0.6rem;
+  color: var(--dusk-mute);
+}
+
+.call-detail summary {
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.call-detail code {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--seam) 45%, transparent);
+  border-radius: 2px;
+  background: var(--dusk-lift);
+}
+
 .phase {
   display: flex;
   align-items: center;

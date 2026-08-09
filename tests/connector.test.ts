@@ -15,7 +15,13 @@
  *                              parked on a different one. Their setting.
  */
 import { describe, it, expect } from 'vitest';
-import { ConnectError, connectWallet, pickWallet } from '../src/lib/connector.js';
+import {
+  ConnectError,
+  connectWallet,
+  deepestMessage,
+  describeWalletError,
+  pickWallet,
+} from '../src/lib/connector.js';
 import type { DiscoveredWallet } from '../src/lib/connector.js';
 
 /** A wallet whose `connect` always fails in the given way. */
@@ -104,6 +110,71 @@ describe('connect errors — anything else', () => {
     const e = await kindOf('just a string');
     expect(e.kind).toBe('unknown');
     expect(e.detail).toBe('just a string');
+  });
+});
+
+/**
+ * Regression cover for a real failure. A check-in on Preview surfaced as
+ *
+ *   Unexpected error submitting scoped transaction '<unnamed>': Error
+ *
+ * and nothing else. Midnight.js builds that string with
+ * `new Error(\`...: ${String(err)}\`, { cause: err })`, so when the underlying
+ * error has an empty message the interpolation degrades to the bare word
+ * "Error" — and reading only `.message` threw away the one link that said what
+ * actually went wrong.
+ */
+describe('error cause chains', () => {
+  const wrapped = (summary: string, cause: unknown) => new Error(summary, { cause });
+
+  it('reaches past a wrapper whose summary lost the cause', () => {
+    const real = new Error('Not enough Dust to pay the transaction fee');
+    const outer = wrapped("Unexpected error submitting scoped transaction '<unnamed>': Error", real);
+
+    expect(deepestMessage(outer)).toBe('Not enough Dust to pay the transaction fee');
+  });
+
+  it('discards a wrapper that says only "Error"', () => {
+    // The exact shape observed: an inner error carrying no message at all.
+    const outer = wrapped("Unexpected error submitting scoped transaction '<unnamed>': Error", new Error(''));
+
+    // Nothing in the chain is informative, so the caller's fallback must win
+    // rather than the misleading summary.
+    expect(describeWalletError(outer, 'The circuit call did not complete.')).toBe(
+      'The circuit call did not complete.',
+    );
+  });
+
+  it('reads Effect-style causes, which are plain objects rather than Errors', () => {
+    const outer = wrapped('Unexpected error submitting scoped transaction: Error', {
+      name: 'TransactionRejected',
+      message: 'transaction was rejected by the node',
+    });
+
+    expect(deepestMessage(outer)).toBe('transaction was rejected by the node');
+  });
+
+  it('takes the innermost message when several wrappers nest', () => {
+    const chain = wrapped('outer', wrapped('middle', new Error('the real reason')));
+    expect(deepestMessage(chain)).toBe('the real reason');
+  });
+
+  it('survives a cyclic cause chain instead of hanging', () => {
+    const a = new Error('first');
+    const b = new Error('second');
+    (a as { cause?: unknown }).cause = b;
+    (b as { cause?: unknown }).cause = a;
+
+    expect(deepestMessage(a)).toBe('second');
+  });
+
+  it('still prefers a coded connector error over the chain', () => {
+    const apiErr = Object.assign(new Error(''), {
+      type: 'DAppConnectorAPIError',
+      code: 'Rejected',
+      reason: 'user said no',
+    });
+    expect(describeWalletError(apiErr, 'fallback')).toBe('Rejected in the wallet.');
   });
 });
 
