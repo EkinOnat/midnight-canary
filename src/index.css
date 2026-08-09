@@ -243,6 +243,37 @@ a:hover {
   color: var(--dusk-mute);
 }
 
+/* ─── Crash fallback ─────────────────────────────────────────────────────── */
+
+/* Deliberately all on the dusk side. A render failure is a failure of this
+   machine, not of the chain, and the page should keep saying which side of the
+   seam it is on even when there is no seam left to draw. */
+.crash {
+  flex: 1;
+  padding: clamp(2.4rem, 7vw, 5rem) clamp(1.1rem, 4vw, 2.75rem) 3rem;
+  max-width: 44rem;
+}
+
+.crash-detail {
+  margin: 0 0 1.9rem;
+  padding: 0.75rem 0.85rem;
+  max-width: 34rem;
+  border: 1px solid color-mix(in srgb, var(--seam) 45%, transparent);
+  border-radius: 2px;
+  background: var(--dusk-lift);
+  font-family: var(--mono);
+  color: var(--dusk-mute);
+}
+
+.crash-foot {
+  margin: 1.6rem 0 0;
+  max-width: 34rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--dusk-mute);
+}
+
 /* ─── The split ──────────────────────────────────────────────────────────── */
 
 .split {
