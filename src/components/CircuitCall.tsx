@@ -47,6 +47,7 @@ export function CircuitCall({
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
   const [crossing, setCrossing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [fingerprint, setFingerprint] = useState(() => identityFingerprint(getIdentitySecret()));
 
   const running = phase !== null;
@@ -73,6 +74,18 @@ export function CircuitCall({
     scoreRef.current = null;
     setArmed(false);
   }, []);
+
+  // An indexer round-trip is fast but not instant, and a button that looks
+  // untouched reads as broken. `refreshPulse` reports failure through
+  // `pulseError`, so there is nothing to catch here — only a flag to clear.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshPulse();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshPulse]);
 
   const newIdentity = useCallback(() => {
     setFingerprint(identityFingerprint(rotateIdentitySecret()));
@@ -275,10 +288,11 @@ export function CircuitCall({
           <button
             type="button"
             className="act"
-            onClick={() => void refreshPulse()}
-            disabled={running}
+            onClick={() => void refresh()}
+            disabled={running || refreshing}
+            aria-busy={refreshing}
           >
-            Refresh
+            {refreshing ? 'Reading…' : 'Refresh'}
           </button>
         </div>
 
