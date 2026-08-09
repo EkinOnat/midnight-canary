@@ -195,8 +195,20 @@ export function CircuitCall({
         </button>
         <p className="claim">Proved without revealing your input</p>
 
+        {/* A live region has to already be in the document when its content
+            changes, or screen readers routinely miss the first announcement.
+            The visual list below was mounted at the same instant it got its
+            text, so it never announced reliably. This one is always mounted
+            and only its text changes; the list is decorative to assistive
+            tech. It matters here more than usual — proof generation is the
+            longest wait in the app and the phase is the only signal that
+            anything is happening. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {phase ? PHASE_LABELS[phase] : ''}
+        </p>
+
         {running ? (
-          <ol className="phases" role="status" aria-live="polite">
+          <ol className="phases" aria-hidden="true">
             {PHASE_ORDER.map((p, i) => (
               <li
                 key={p}
