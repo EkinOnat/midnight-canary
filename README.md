@@ -203,8 +203,13 @@ The score you pick is never rendered after you pick it. The buttons are replaced
 by "Kept to yourself", and the value lives in a ref rather than React state, so
 it is absent from the DOM, from devtools snapshots, and from the profiler.
 
-Every text element meets WCAG AA contrast, touch targets are 46 px, focus is
-visible on keyboard navigation, and `prefers-reduced-motion` is respected.
+Every text element meets WCAG AA contrast — measured, not assumed: the lowest
+ratio anywhere on the page is 5.15:1 against a 4.5:1 requirement. The score
+buttons are 46 px, comfortably past the 44 px guidance for a primary target.
+Focus is visible on keyboard navigation, `prefers-reduced-motion` is respected,
+and proof progress is announced through a live region that is mounted before it
+has anything to say — mounting it alongside its own first message is the case
+screen readers routinely miss.
 
 ## Prerequisites
 
@@ -449,7 +454,8 @@ prints what was built:
 │   ├── config.ts                network + contract address from VITE_ env vars
 │   ├── components/
 │   │   ├── WalletConnect.tsx    wallet connect/disconnect UI
-│   │   └── CircuitCall.tsx      checkIn button, masked score entry, result display
+│   │   ├── CircuitCall.tsx      checkIn button, masked score entry, result display
+│   │   └── ErrorBoundary.tsx    fallback for render failures
 │   ├── hooks/
 │   │   └── useMidnight.ts       Midnight.js SDK hook: session, providers, contract
 │   ├── lib/
@@ -471,7 +477,8 @@ prints what was built:
 │   ├── compile-summary.js       renders the circuit table after compiling
 │   └── copy-zk-assets.js        stages ZK artifacts for the browser
 ├── screenshots/                 submission evidence
-├── .github/workflows/           CI/CD (Level 3)
+├── .github/workflows/ci.yml     CI/CD: test + build, and Compact compile
+├── PROPOSAL.md                  product proposal
 └── README.md
 ```
 
