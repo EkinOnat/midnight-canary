@@ -1,0 +1,87 @@
+# Canary CI
+#
+# Two jobs on purpose. `test` needs nothing but Node, so it reports in about two
+# minutes; `compile` has to download and install the Compact toolchain, which is
+# slower and depends on an upstream release. Splitting them means a toolchain
+# outage is instantly distinguishable from a real test failure, instead of both
+# showing up as one red X.
+#
+# Both jobs must pass for the badge to go green.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js v22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+      # The frontend builds from the committed `managed/` artifacts, so this
+      # needs no Compact toolchain. Also the Level 3 "zero build errors" check.
+      - name: Build the frontend
+        run: npm run build
+
+  compile:
+    name: Compact compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js v22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # scripts/compile-summary.js runs on Node, and the compiler resolves
+      # @midnight-ntwrk/compact-runtime from node_modules.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install the Compact toolchain
+        env:
+          # Nothing sources a shell profile on a runner, so let the installer
+          # skip rewriting them; the PATH is set explicitly below instead.
+          COMPACT_NO_MODIFY_PATH: '1'
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch the compiler toolchain
+        run: |
+          compact update
+          compact --version
+          compact compile --version
+
+      # `npm run compile` is `compact compile contracts/canary.compact
+      # managed/canary` followed by scripts/compile-summary.js, which fails the
+      # job if any ZK circuit is missing its prover key, verifier key or ZKIR.
+      - name: Compile the contract
+        run: npm run compile
