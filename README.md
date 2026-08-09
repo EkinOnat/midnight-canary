@@ -378,7 +378,7 @@ Midnight specifically, the public/private data model, and the path to Mainnet.
 
 ## Demo Video
 
-**https://youtu.be/biNR6PxyLR4**
+**https://youtu.be/8H8-Ta2fb9g**
 
 Connecting Lace on Preview, then a live `checkIn` call: the score is picked and
 immediately hidden, the proof is generated locally, and the transaction lands
