@@ -851,6 +851,28 @@ a:hover {
   .rail {
     gap: 0.75rem 1.1rem;
   }
+
+  /* The rail wrapped to three rows on a phone and pushed the headline a third
+     of the way down the screen. The spacer exists only to shove the wallet
+     control to the right edge on a single-row desktop rail; once the rail
+     wraps it is a whole row of nothing. Dropping it, and sending the facts to
+     their own line, puts the mark and the wallet on one row and the network
+     and contract on the next. */
+  .rail-spacer {
+    display: none;
+  }
+
+  .rail-facts {
+    order: 3;
+    flex-basis: 100%;
+    gap: 1rem;
+  }
+
+  /* A contract address is raw hex with no shared prefix, so a shorter window
+     still identifies it. The full value stays in the title attribute. */
+  .rail-facts .trunc {
+    max-width: 20ch;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
