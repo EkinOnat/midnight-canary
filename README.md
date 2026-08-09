@@ -388,14 +388,26 @@ anywhere on screen.
 ## Verify the Deployment
 
 Reads the contract's public state straight back off the indexer. Needs no wallet
-and no funds — public state is public:
+and no funds — public state is public, so this runs from a fresh clone:
 
 ```bash
 npm run verify -- --network preview
 ```
 
+The address comes from `--address` if given, then your local deployment record,
+then the address this project published. That last fallback matters: the record
+lives in `.midnight-state.json`, which is gitignored because it also holds the
+wallet seed — so without it, the command that exists to let *someone else*
+confirm the contract is real only ever ran for whoever deployed it. Pass
+`--address <hex>` to point it at any other Canary deployment.
+
 ```
+  Network:      preview
   Contract:     713e14035854aee952c8f2c56f2b871f14f1ce8a8b59d2fa96e51f9d2204bbc8
+  Source:       published address for preview (no local deployment record)
+  Indexer:      https://indexer.preview.midnight.network/api/v4/graphql
+
+  Querying on-chain state...
   ✅ Contract found on-chain.
 
   ── Public ledger state ─────────────────────

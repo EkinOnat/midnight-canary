@@ -28,6 +28,37 @@ export interface DeploymentRecord {
   deployer: string;
 }
 
+/**
+ * Contracts this project has deployed publicly, so read-only tools work from a
+ * fresh clone.
+ *
+ * Deployment records live in `.midnight-state.json`, which is gitignored
+ * because it also holds the wallet seed. That is correct, but it meant
+ * `npm run verify` — a command whose entire purpose is letting someone else
+ * confirm the contract is real — only ran for whoever deployed it. A contract
+ * address is public information, so it belongs in the repo.
+ *
+ * Mirrors `DEFAULT_ADDRESSES` in `src/config.ts`, which does the same for the
+ * frontend.
+ */
+export const PUBLIC_DEPLOYMENTS: Partial<Record<NetworkId, string>> = {
+  preview: '713e14035854aee952c8f2c56f2b871f14f1ce8a8b59d2fa96e51f9d2204bbc8',
+};
+
+/** Read `--address <hex>` / `--address=<hex>`, for verifying someone else's. */
+export function parseAddressFlag(argv: string[]): string | null {
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--address') {
+      const v = argv[i + 1];
+      if (v === undefined) throw new Error('--address requires a value');
+      return v;
+    }
+    if (arg.startsWith('--address=')) return arg.slice('--address='.length);
+  }
+  return null;
+}
+
 export interface NetworkState {
   version: 1;
   activeNetwork: NetworkId;

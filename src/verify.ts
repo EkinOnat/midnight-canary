@@ -10,7 +10,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
 
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import { resolveNetwork, getDeployment } from './network';
+import {
+  resolveNetwork,
+  getDeployment,
+  parseAddressFlag,
+  PUBLIC_DEPLOYMENTS,
+} from './network';
 import type * as CanaryModule from '../managed/canary/contract/index.js';
 
 // @ts-expect-error Required for the indexer's GraphQL subscriptions
@@ -28,11 +33,19 @@ const Canary = (await import(pathToFileURL(contractPath).href)) as typeof Canary
 
 async function main() {
   const { network, config } = resolveNetwork();
-  const deployment = getDeployment(network);
 
-  if (!deployment) {
-    console.error(`\n❌ No deployment on record for "${network}".`);
-    console.error(`   Run: npm run deploy -- --network ${network}\n`);
+  // Explicit flag, then the local deployment record, then the address this
+  // project published. The record is gitignored — it holds the wallet seed —
+  // so without the last fallback this command only ever ran for whoever did
+  // the deploying, which defeats the point of a verification tool.
+  const override = parseAddressFlag(process.argv);
+  const deployment = getDeployment(network);
+  const address = override ?? deployment?.address ?? PUBLIC_DEPLOYMENTS[network];
+
+  if (!address) {
+    console.error(`\n❌ No deployment on record for "${network}", and none published.`);
+    console.error(`   Run: npm run deploy -- --network ${network}`);
+    console.error(`   Or verify a specific contract: npm run verify -- --address <hex>\n`);
     process.exit(1);
   }
 
@@ -40,14 +53,19 @@ async function main() {
   console.log('║                  Canary — deployment check                   ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
   console.log(`  Network:      ${network}`);
-  console.log(`  Contract:     ${deployment.address}`);
-  console.log(`  Deployed at:  ${deployment.deployedAt}`);
-  console.log(`  Deployer:     ${deployment.deployer}`);
+  console.log(`  Contract:     ${address}`);
+  if (deployment && !override) {
+    console.log(`  Deployed at:  ${deployment.deployedAt}`);
+    console.log(`  Deployer:     ${deployment.deployer}`);
+  } else if (!override) {
+    // Say so rather than implying a local record exists.
+    console.log(`  Source:       published address for ${network} (no local deployment record)`);
+  }
   console.log(`  Indexer:      ${config.indexer}\n`);
 
   console.log('  Querying on-chain state...');
   const provider = indexerPublicDataProvider(config.indexer, config.indexerWS);
-  const contractState = await provider.queryContractState(deployment.address);
+  const contractState = await provider.queryContractState(address);
 
   if (!contractState) {
     console.error('\n  ❌ Indexer returned no state for that address.\n');
