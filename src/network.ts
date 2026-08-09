@@ -146,6 +146,17 @@ export function saveState(state: NetworkState, opts: FsOptions = {}): void {
   fs.renameSync(tmp, p);
 }
 
+/**
+ * The target network, from `--network <id>`, `--network=<id>`, or a bare `<id>`.
+ *
+ * The bare form is not sugar, it is a workaround. npm on Windows parses
+ * `--network` out of `npm run verify -- --network preview` as one of its own
+ * config options — it warns `Unknown cli config "--network"` and runs
+ * `tsx src/verify.ts preview`, so the script sees a lone positional and no
+ * flag. It then silently fell through to `undeployed`, pointed every wallet at
+ * localhost, and hung. Accepting the positional makes the documented command
+ * work the same way in PowerShell as it does in bash.
+ */
 export function parseNetworkFlag(argv: string[]): NetworkId | null {
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
@@ -164,6 +175,18 @@ export function parseNetworkFlag(argv: string[]): NetworkId | null {
       }
       return v;
     }
+  }
+
+  // No flag survived. Look for a bare network id among the positionals,
+  // stepping over any other flag and the value that belongs to it so that
+  // `--address <hex>` is never mistaken for one.
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith('-')) {
+      if (!arg.includes('=')) i++;
+      continue;
+    }
+    if (isNetworkId(arg)) return arg;
   }
   return null;
 }

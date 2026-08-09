@@ -285,7 +285,7 @@ Docker running:
 ```bash
 npm install
 docker compose up -d --wait proof-server
-npm run deploy -- --network preview
+npm run deploy -- preview
 ```
 
 The script prints a wallet address and then polls until you fund it from
@@ -293,7 +293,7 @@ https://faucet.preview.midnight.network/ — it continues by itself once the
 tNIGHT lands. Confirm the result:
 
 ```bash
-npm run verify -- --network preview
+npm run verify -- preview
 ```
 
 ### Deploy the frontend
@@ -391,7 +391,7 @@ Reads the contract's public state straight back off the indexer. Needs no wallet
 and no funds — public state is public, so this runs from a fresh clone:
 
 ```bash
-npm run verify -- --network preview
+npm run verify -- preview
 ```
 
 The address comes from `--address` if given, then your local deployment record,
@@ -400,6 +400,14 @@ lives in `.midnight-state.json`, which is gitignored because it also holds the
 wallet seed — so without it, the command that exists to let *someone else*
 confirm the contract is real only ever ran for whoever deployed it. Pass
 `--address <hex>` to point it at any other Canary deployment.
+
+> **Why `-- preview` and not `-- --network preview`.** npm on Windows parses
+> `--network` as one of its own config options, warns `Unknown cli config
+> "--network"`, and passes only the bare word through. The script then saw no
+> network, fell back to `undeployed` — whose endpoints are all localhost — and
+> hung retrying against a dead socket. Every script here accepts a bare network
+> name for that reason, and `--network preview` still works where the shell
+> permits it.
 
 ```
   Network:      preview
@@ -616,6 +624,19 @@ in it — which is the whole point of the contract.
 
 ![Deployment check showing the contract address and its public ledger state](screenshots/02-contract-deployed.png)
 
-This was taken the day the contract went up, so its counters are all zero. The
-[Verify the Deployment](#verify-the-deployment) section above shows the same
-command against the contract as it stands now, with a check-in recorded.
+This was taken the day the contract went up, so its counters are all zero.
+
+### Contract in use — a check-in recorded on-chain
+
+The same command, run after a live check-in from the browser dApp. This is the
+one worth reading closely, because an empty contract only proves the deployment
+worked — this proves the privacy model.
+
+`responses` is 1, so someone answered, and a nullifier is recorded so they
+cannot answer twice this round. `alerts` is 0, so their score was above the
+threshold: a 3, a 4 or a 5. **Which of the three is not recoverable from
+anything here**, and neither is who they were — the nullifier is a one-way hash
+of a secret that never left their browser, and it is not derived from the wallet
+that paid the fee. One bit crossed the boundary, which is the whole design.
+
+![Verify output showing responses 1, alerts 0 and one nullifier](screenshots/03-contract-live.png)
