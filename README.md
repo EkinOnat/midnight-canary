@@ -378,12 +378,27 @@ Midnight specifically, the public/private data model, and the path to Mainnet.
 
 ## Demo Video
 
+Two recordings, kept separately because they show different things — the second
+is not a re-cut of the first.
+
+### Level 3 — tests, pipeline and a live check-in
+
 **https://youtu.be/WJPCr0ZpcVk**
+
+The current submission. The full dApp flow end to end, alongside the evidence
+Level 3 asks for: the test suite passing, and the CI badge green.
+
+### Level 2 — the dApp working for the first time
+
+**https://youtu.be/biNR6PxyLR4**
 
 Connecting Lace on Preview, then a live `checkIn` call: the score is picked and
 immediately hidden, the proof is generated locally, and the transaction lands
 on-chain — with the public counters moving and the score never appearing
 anywhere on screen.
+
+Kept because it is the narrower, closer look at the circuit call itself, without
+the surrounding tooling.
 
 ## Verify the Deployment
 
